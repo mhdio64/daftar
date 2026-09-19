@@ -1,0 +1,26 @@
+{
+  "name": "daftar-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "سامانه مدیریت دارایی‌ها، دسترسی‌ها و مستندات سازمانی (دفتر)",
+  "scripts": {
+    "dev": "pnpm --parallel --filter daftar-server --filter daftar-client dev",
+    "dev:server": "pnpm --filter daftar-server dev",
+    "dev:client": "pnpm --filter daftar-client dev",
+    "build": "pnpm --filter daftar-server build && pnpm --filter daftar-client build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm --filter daftar-server test",
+    "db:generate": "pnpm --filter daftar-server prisma:generate",
+    "db:migrate": "pnpm --filter daftar-server prisma:migrate"
+  },
+  "keywords": [
+    "asset-management",
+    "vault",
+    "secrets",
+    "cmdb",
+    "farsi",
+    "on-premise"
+  ],
+  "author": "",
+  "license": "ISC"
+}

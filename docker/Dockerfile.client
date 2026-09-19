@@ -1,0 +1,21 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+COPY package.json pnpm-workspace.yaml ./
+COPY client/package.json ./client/
+
+RUN pnpm install --filter client --frozen-lockfile=false
+
+COPY client ./client
+
+WORKDIR /app/client
+RUN pnpm build
+
+# خروجی استاتیک در دایرکتوری dist قرار می‌گیرد و به کانتینر Caddy یا Nginx متصل می‌شود
+FROM alpine:latest
+WORKDIR /usr/share/caddy
+COPY --from=builder /app/client/dist ./
+CMD ["sh", "-c", "cp -r /usr/share/caddy/* /target/ 2>/dev/null || true"]

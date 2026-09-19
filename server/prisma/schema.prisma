@@ -1,0 +1,144 @@
+// این فایل شمای دیتابیس سامانه «دفتر» در Prisma است
+// مستندات مرجع: docs/02-data-model-and-schema.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN   // دسترسی کامل به سیستم، ساختار فیلدها و کاربران
+  EDITOR  // ثبت و ویرایش دارایی‌ها در دسته‌های مجاز
+  VIEWER  // مشاهده دارایی‌های مجاز و پایش سررسیدها
+}
+
+model User {
+  id                  String       @id @default(cuid())
+  username            String       @unique
+  fullName            String
+  passwordHash        String
+  role                Role         @default(VIEWER)
+  categoryPermissions Json         @default("[]") // آرایه‌ای از شناسه‌های AssetType مجاز
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // روابط
+  createdAssets       Asset[]      @relation("CreatedByUser")
+  updatedAssets       Asset[]      @relation("UpdatedByUser")
+  auditLogs           AuditLog[]
+  renewalLogs         RenewalLog[]
+  uploadedAttachments Attachment[]
+
+  @@map("users")
+}
+
+model AssetType {
+  id               String       @id @default(cuid())
+  name             String       // نام فارسی دسته (مثلا "سرورهای مجازی")
+  slug             String       @unique // نامک انگلیسی (مثلا "vps")
+  icon             String       @default("Server") // نام آیکون Lucide
+  description      String?
+  schemaDefinition Json         @default("[]") // آرایه تعاریف فیلدهای داینامیک
+  typeDocsMarkdown String?      @db.Text // مستندات و ویکی راهنمای جامع کل دسته
+  displayOrder     Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // روابط
+  assets           Asset[]
+  attachments      Attachment[]
+
+  @@map("asset_types")
+}
+
+model Asset {
+  id              String       @id @default(cuid())
+  assetTypeId     String
+  assetType       AssetType    @relation(fields: [assetTypeId], references: [id], onDelete: Cascade)
+  title           String       // عنوان دارایی (مثلا "سرور اصلی دیتاسنتر تهران")
+  values          Json         @default("{}") // مقادیر فیلدهای عمومی غیرمحرمانه
+  encryptedValues Json         @default("{}") // مقادیر رمزنگاری شده با الگوریتم AES-256-GCM
+  expiryDate      DateTime?    // تاریخ سررسید/انقضا (برای یادآورها)
+  docsMarkdown    String?      @db.Text // مستندات و راهنمای فنی اختصاصی این تک دارایی
+  
+  createdById     String
+  createdBy       User         @relation("CreatedByUser", fields: [createdById], references: [id])
+  updatedById     String
+  updatedBy       User         @relation("UpdatedByUser", fields: [updatedById], references: [id])
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // روابط
+  attachments     Attachment[]
+  renewals        RenewalLog[]
+
+  @@index([assetTypeId])
+  @@index([expiryDate])
+  @@map("assets")
+}
+
+model Attachment {
+  id           String     @id @default(cuid())
+  assetTypeId  String?
+  assetType    AssetType? @relation(fields: [assetTypeId], references: [id], onDelete: Cascade)
+  assetId      String?
+  asset        Asset?     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  originalName String     // نام اصلی فایل هنگام آپلود
+  storagePath  String     // آدرس ذخیره‌سازی روی دیسک لوکال
+  mimeType     String
+  sizeBytes    Int        // حجم به بایت
+  
+  uploadedById String
+  uploadedBy   User       @relation(fields: [uploadedById], references: [id])
+  
+  createdAt    DateTime   @default(now())
+
+  @@index([assetTypeId])
+  @@index([assetId])
+  @@map("attachments")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  
+  action       String   // CREATE, UPDATE, DELETE, READ_SECRET, LOGIN, LOGOUT
+  targetEntity String   // Asset, AssetType, User
+  targetId     String   // شناسه موجودیت هدف
+  diff         Json?    // جزئیات تغییرات (فیلدهای قدیم و جدید)
+  
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([targetEntity, targetId])
+  @@map("audit_logs")
+}
+
+model RenewalLog {
+  id                 String    @id @default(cuid())
+  assetId            String
+  asset              Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  previousExpiryDate DateTime?
+  newExpiryDate      DateTime
+  cost               BigInt?   // مبلغ هزینه به ریال/تومان
+  note               String?   // توضیحات تمدید، شماره فاکتور یا تامین‌کننده
+  
+  renewedById        String
+  renewedBy          User      @relation(fields: [renewedById], references: [id])
+  renewedAt          DateTime  @default(now())
+
+  @@index([assetId])
+  @@map("renewal_logs")
+}

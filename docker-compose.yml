@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # وب‌سرور معکوس و HTTPS خودکار برای شبکه داخلی LAN
+  caddy:
+    image: caddy:2-alpine
+    container_name: daftar_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - client_dist:/usr/share/caddy:ro
+    depends_on:
+      - server
+
+  # سرور بک‌اند API
+  server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    container_name: daftar_server
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-daftar_user}:${POSTGRES_PASSWORD:-daftar_secret_password}@postgres:5432/${POSTGRES_DB:-daftar_db}?schema=public
+      - MASTER_ENCRYPTION_KEY=${MASTER_ENCRYPTION_KEY:-c3f1e92d847b5a190e2d4c8f71a6e5b38d9c2a1f4e7b0c3d6e9a2f5b8c1d4e7a}
+      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_at_least_32_characters_long}
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE_BYTES=52428800
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # پایگاه‌داده اصلی PostgreSQL 16
+  postgres:
+    image: postgres:16-alpine
+    container_name: daftar_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-daftar_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-daftar_secret_password}
+      - POSTGRES_DB=${POSTGRES_DB:-daftar_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-daftar_user} -d ${POSTGRES_DB:-daftar_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # کانتینر بکاپ‌گیری دوره‌ای
+  backup:
+    image: postgres:16-alpine
+    container_name: daftar_backup
+    restart: unless-stopped
+    volumes:
+      - ./docker/backup.sh:/backup.sh:ro
+      - backups_data:/backups
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=${POSTGRES_USER:-daftar_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-daftar_secret_password}
+      - POSTGRES_DB=${POSTGRES_DB:-daftar_db}
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploads_data:
+  backups_data:
+  caddy_data:
+  caddy_config:
+  client_dist:

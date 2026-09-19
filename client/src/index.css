@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* پالت رنگی حرفه‌ای و مهندسی‌شده SaaS مدرن (الهام از Linear، Stripe و GitHub) */
+  :root {
+    /* پس‌زمینه با خاکستری مهندسی‌شده خنک جهت تفکیک برجسته از کارت‌ها و سطوح سفید */
+    --color-canvas: 246 248 250;           /* #F6F8FA - خاکستری ساختاریافته */
+    --color-surface-1: 255 255 255;        /* #FFFFFF - پنل‌ها، جداول و کارت‌های سفید برجسته */
+    --color-surface-2: 241 245 249;        /* #F1F5F9 - هدر جدول، فیلدهای اینپوت، پس‌زمینه‌های فرعی */
+    --color-surface-elevated: 226 232 240; /* #E2E8F0 - دکمه‌های ثانویه و منوها */
+    --color-border-subtle: 226 232 240;    /* #E2E8F0 - مرزبندی‌های تمیز 1px */
+    --color-border-strong: 203 213 225;    /* #CBD5E1 - خطوط اینپوت‌ها و جداول */
+  }
+
+  /* تم تیره عمیق و های‌کنتراست */
+  .dark {
+    --color-canvas: 11 15 25;              /* #0B0F19 */
+    --color-surface-1: 17 24 39;           /* #111827 */
+    --color-surface-2: 30 41 59;           /* #1E293B */
+    --color-surface-elevated: 51 65 85;     /* #334155 */
+    --color-border-subtle: 30 41 59;       /* #1E293B */
+    --color-border-strong: 51 65 85;       /* #334155 */
+  }
+
+  body {
+    @apply bg-canvas text-slate-900 dark:text-slate-100 font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* اسکرول‌بار ظریف */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300/80 dark:bg-slate-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400 dark:bg-slate-600;
+  }
+}
