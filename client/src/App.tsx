@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Server, 
   Mail, 
@@ -56,6 +56,14 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<'assets' | 'reminders' | 'audit' | 'users' | 'settings'>('assets');
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [activeTypeId, setActiveTypeId] = useState<string | null>(null);
+
+  const activeAssetType = assetTypes.find((t) => t.id === activeTypeId);
+
+  // فیلدهای قابل نمایش در جدول بر اساس تنظیمات بخش «تنظیم فیلدها» (showInTable !== false)
+  const visibleFields = useMemo(() => {
+    if (!activeAssetType) return [];
+    return activeAssetType.schemaDefinition.filter((f) => f.showInTable !== false);
+  }, [activeAssetType]);
   
   // داده‌های دارایی‌ها
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -86,7 +94,7 @@ function AppContent() {
     updateSettings({ theme: theme === 'light' ? 'dark' : 'light' });
   };
 
-  // خروجی اکسل از دارایی‌های جاری این دسته
+  // خروجی اکسل از دارایی‌های جاری این دسته با ستون‌های انتخابی کاربر
   const handleExportExcel = () => {
     if (!activeAssetType) return;
     if (assets.length === 0) {
@@ -94,7 +102,7 @@ function AppContent() {
       return;
     }
     try {
-      exportAssetsToExcel(activeAssetType, assets);
+      exportAssetsToExcel({ ...activeAssetType, schemaDefinition: visibleFields }, assets);
       showToast(`خروجی اکسل «${activeAssetType.name}» با موفقیت دانلود شد.`, 'success');
     } catch (err: any) {
       showToast(err.message || 'خطا در صدور خروجی اکسل', 'error');
@@ -159,12 +167,28 @@ function AppContent() {
       const res = await assetTypesService.getAll();
       if (res.items && res.items.length > 0) {
         setAssetTypes(res.items);
+        try {
+          localStorage.setItem('daftar_asset_types', JSON.stringify(res.items));
+        } catch {}
         if (!activeTypeId) setActiveTypeId(res.items[0].id);
         return;
       }
     } catch {
       // استفاده از داده‌های پیش‌فرض
     }
+
+    // بررسی آیا دسته‌بندی‌ها در localStorage ذخیره شده‌اند (مثلاً پس از بازیابی)
+    try {
+      const stored = localStorage.getItem('daftar_asset_types');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAssetTypes(parsed);
+          if (!activeTypeId) setActiveTypeId(parsed[0].id);
+          return;
+        }
+      }
+    } catch {}
 
     // دسته‌بندی‌های نمونه اولیه جهت بررسی کامل UI
     const defaultAssetTypes: AssetType[] = [
@@ -255,6 +279,20 @@ function AppContent() {
       // فال‌بک به داده‌های نمایشی دمو
     }
 
+    // بررسی آیا دارایی‌ها در localStorage ذخیره شده‌اند (مثلاً پس از بازیابی اطلاعات)
+    try {
+      const stored = localStorage.getItem('daftar_demo_assets');
+      if (stored) {
+        const parsed: Asset[] = JSON.parse(stored);
+        const filtered = parsed.filter((a) => a.assetTypeId === typeId);
+        if (filtered.length > 0) {
+          setAssets(filtered);
+          setIsAssetsLoading(false);
+          return;
+        }
+      }
+    } catch {}
+
     // تولید داده‌های نمونه برای پیش‌نمایش
     let sampleAssets: Asset[] = [];
     if (typeId === 'vps') {
@@ -340,6 +378,66 @@ function AppContent() {
           updatedAt: new Date().toISOString(),
         },
       ];
+    } else if (typeId === 'domains') {
+      sampleAssets = [
+        {
+          id: 'dom-1',
+          assetTypeId: 'domains',
+          assetType: activeAssetType!,
+          title: 'دامنه اصلی شرکت (company.ir)',
+          values: {
+            domain_name: 'company.ir',
+            registrar: 'ایران‌سرور / ایرنیک',
+            expiry_date: '۱۴۰۵/۰۶/۳۰',
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: 'dom-2',
+          assetTypeId: 'domains',
+          assetType: activeAssetType!,
+          title: 'دامنه بین‌المللی برند (company.com)',
+          values: {
+            domain_name: 'company.com',
+            registrar: 'Namecheap',
+            expiry_date: '۱۴۰۴/۱۱/۱۵',
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+    } else if (typeId === 'licenses') {
+      sampleAssets = [
+        {
+          id: 'lic-1',
+          assetTypeId: 'licenses',
+          assetType: activeAssetType!,
+          title: 'لایسنس ابری JetBrains All Products',
+          values: {
+            software_name: 'JetBrains Toolbox',
+            license_key: '••••••••',
+            vendor: 'JetBrains s.r.o.',
+            expiry_date: '۱۴۰۵/۰۱/۲۰',
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: 'lic-2',
+          assetTypeId: 'licenses',
+          assetType: activeAssetType!,
+          title: 'اشتراک سالانه GitKraken Pro',
+          values: {
+            software_name: 'GitKraken Client',
+            license_key: '••••••••',
+            vendor: 'Axosoft',
+            expiry_date: '۱۴۰۴/۱۰/۰۱',
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
     }
 
     setAssets(sampleAssets);
@@ -364,7 +462,6 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const activeAssetType = assetTypes.find((t) => t.id === activeTypeId);
 
   const handleCopy = (text: string, identifier: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -431,8 +528,8 @@ function AppContent() {
     }
   };
 
-  // اگر نیاز به راه‌اندازی اولیه باشد
-  if (setupNeeded) {
+  // اگر نیاز به راه‌اندازی اولیه باشد (در حالت دمو رد می‌شود)
+  if (setupNeeded && token !== 'demo-token-preview') {
     return <SetupWizard />;
   }
 
@@ -704,7 +801,18 @@ function AppContent() {
         {activeTab === 'audit' && <AuditLogsView />}
 
         {/* نمای تنظیمات سامانه */}
-        {activeTab === 'settings' && <SettingsView />}
+        {activeTab === 'settings' && (
+          <SettingsView
+            assetTypes={assetTypes}
+            assets={assets}
+            onDataRestored={async () => {
+              await loadAssetTypes();
+              if (activeTypeId) {
+                await loadAssets(activeTypeId);
+              }
+            }}
+          />
+        )}
 
         {/* نمای گرید دارایی‌ها */}
         {activeTab === 'assets' && activeAssetType && (
@@ -853,8 +961,8 @@ function AppContent() {
                       <th className={`${density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'} w-12 text-center`}>#</th>
                       <th className={density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'}>عنوان دارایی</th>
 
-                      {/* رندر ستون‌های داینامیک */}
-                      {activeAssetType.schemaDefinition.map((field) => (
+                      {/* رندر ستون‌های داینامیک انتخاب‌شده توسط کاربر */}
+                      {visibleFields.map((field) => (
                         <th key={field.id} className={density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'}>
                           {field.label}
                         </th>
@@ -869,7 +977,7 @@ function AppContent() {
                     {isAssetsLoading ? (
                       <tr>
                         <td
-                          colSpan={activeAssetType.schemaDefinition.length + 3}
+                          colSpan={visibleFields.length + 3}
                           className="p-8 text-center text-slate-500 dark:text-slate-400"
                         >
                           در حال بارگذاری اطلاعات دارایی‌ها...
@@ -890,12 +998,15 @@ function AppContent() {
                             }`}
                           >
                             <td className={`${cellPadding} text-center text-slate-400 dark:text-slate-500 font-mono`}>{index + 1}</td>
-                            <td className={`${cellPadding} font-semibold text-slate-900 dark:text-slate-100`}>{asset.title}</td>
+                            <td className={`${cellPadding} font-semibold text-slate-900 dark:text-slate-100`}>
+                              {asset.title}
+                            </td>
 
-                            {/* سلول‌های مقادیر بر اساس اسکیما */}
-                            {activeAssetType.schemaDefinition.map((field) => {
+                            {/* سلول‌های مقادیر بر اساس ستون‌های انتخابی */}
+                            {visibleFields.map((field) => {
                               const val = asset.values?.[field.name];
                               const cellId = `${asset.id}-${field.name}`;
+                              const isCopyable = Boolean(field.isCopyable);
 
                               if (field.type === 'secret') {
                                 return (
@@ -907,25 +1018,27 @@ function AppContent() {
 
                               if (field.type === 'ip_port') {
                                 return (
-                                  <td key={field.id} className={cellPadding} dir="ltr">
+                                  <td key={field.id} className={cellPadding}>
                                     {val ? (
                                       <div className="inline-flex items-center gap-1.5">
-                                        <span className={`font-mono font-medium rounded bg-slate-100 text-slate-800 border border-slate-200/90 dark:bg-surface-2 dark:text-indigo-300 dark:border-border-strong ${
+                                        {isCopyable && (
+                                          <button
+                                            onClick={(e) => handleCopy(String(val), cellId, e)}
+                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
+                                            title={`کپی ${field.label}`}
+                                          >
+                                            {copiedCellId === cellId ? (
+                                              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                            ) : (
+                                              <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+                                            )}
+                                          </button>
+                                        )}
+                                        <span dir="ltr" className={`font-mono font-medium rounded bg-slate-100 text-slate-800 border border-slate-200/90 dark:bg-surface-2 dark:text-indigo-300 dark:border-border-strong ${
                                           density === 'compact' ? 'text-[11px] px-1.5 py-0.5' : 'text-xs px-2.5 py-1'
                                         }`}>
                                           {val}
                                         </span>
-                                        <button
-                                          onClick={(e) => handleCopy(val, cellId, e)}
-                                          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-slate-700 dark:hover:text-white transition"
-                                          title="کپی آی‌پی"
-                                        >
-                                          {copiedCellId === cellId ? (
-                                            <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                          ) : (
-                                            <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
-                                          )}
-                                        </button>
                                       </div>
                                     ) : (
                                       <span className="text-slate-400 dark:text-slate-600">—</span>
@@ -938,11 +1051,26 @@ function AppContent() {
                                 return (
                                   <td key={field.id} className={cellPadding}>
                                     {val ? (
-                                      <span className={`inline-flex items-center rounded-md font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 ${
-                                        density === 'compact' ? 'text-[10px] px-1.5 py-0.5' : 'text-[11px] px-2.5 py-1'
-                                      }`}>
-                                        {val}
-                                      </span>
+                                      <div className="inline-flex items-center gap-1.5">
+                                        {isCopyable && (
+                                          <button
+                                            onClick={(e) => handleCopy(String(val), cellId, e)}
+                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
+                                            title={`کپی ${field.label}`}
+                                          >
+                                            {copiedCellId === cellId ? (
+                                              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                            ) : (
+                                              <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+                                            )}
+                                          </button>
+                                        )}
+                                        <span className={`inline-flex items-center rounded-md font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 ${
+                                          density === 'compact' ? 'text-[10px] px-1.5 py-0.5' : 'text-[11px] px-2.5 py-1'
+                                        }`}>
+                                          {val}
+                                        </span>
+                                      </div>
                                     ) : (
                                       <span className="text-slate-400 dark:text-slate-600">—</span>
                                     )}
@@ -952,7 +1080,26 @@ function AppContent() {
 
                               return (
                                 <td key={field.id} className={`${cellPadding} text-slate-700 dark:text-slate-300`}>
-                                  {val || <span className="text-slate-400 dark:text-slate-600">—</span>}
+                                  {val ? (
+                                    <div className="inline-flex items-center gap-1.5 max-w-full">
+                                      {isCopyable && (
+                                        <button
+                                          onClick={(e) => handleCopy(String(val), cellId, e)}
+                                          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
+                                          title={`کپی ${field.label}`}
+                                        >
+                                          {copiedCellId === cellId ? (
+                                            <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                          ) : (
+                                            <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+                                          )}
+                                        </button>
+                                      )}
+                                      <span className="truncate">{val}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 dark:text-slate-600">—</span>
+                                  )}
                                 </td>
                               );
                             })}
@@ -966,7 +1113,7 @@ function AppContent() {
                     ) : (
                       <tr>
                         <td
-                          colSpan={activeAssetType.schemaDefinition.length + 3}
+                          colSpan={visibleFields.length + 3}
                           className="p-12 text-center text-slate-500 dark:text-slate-400"
                         >
                           <div className="max-w-xs mx-auto space-y-3">
@@ -1073,6 +1220,8 @@ function AppContent() {
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
+        assetTypes={assetTypes}
+        currentAssets={assets}
         onSelectAsset={(asset) => {
           setActiveTab('assets');
           setActiveTypeId(asset.assetTypeId);

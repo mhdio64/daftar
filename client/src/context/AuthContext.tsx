@@ -35,25 +35,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       return;
     }
+    if (token === 'demo-token-preview') {
+      const demoUser: User = {
+        id: 'demo-admin',
+        username: 'admin',
+        fullName: 'علی رضایی (مدیر ارشد)',
+        role: 'ADMIN',
+        categoryPermissions: [],
+      };
+      const saved = localStorage.getItem('daftar_user');
+      if (saved) {
+        try {
+          setUser(JSON.parse(saved));
+        } catch {
+          setUser(demoUser);
+        }
+      } else {
+        setUser(demoUser);
+      }
+      setIsLoading(false);
+      return;
+    }
     try {
       const res = await authService.getMe();
       setUser(res.user);
       localStorage.setItem('daftar_user', JSON.stringify(res.user));
     } catch {
-      if (token === 'demo-token-preview') {
-        const saved = localStorage.getItem('daftar_user');
-        if (saved) {
-          try {
-            setUser(JSON.parse(saved));
-          } catch {
-            // fallback
-          }
-        }
-      } else {
-        authService.logout();
-        setUser(null);
-        setToken(null);
-      }
+      authService.logout();
+      setUser(null);
+      setToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -67,8 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     init();
 
     const handleUnauthorized = () => {
-      setUser(null);
-      setToken(null);
+      const currentToken = localStorage.getItem('daftar_token');
+      if (currentToken !== 'demo-token-preview') {
+        setUser(null);
+        setToken(null);
+      }
     };
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);

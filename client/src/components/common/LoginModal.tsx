@@ -27,6 +27,12 @@ export function LoginModal() {
     }
   };
 
+  const handleDemoLogin = (e: React.MouseEvent) => {
+    e.preventDefault();
+    loginAsDemo();
+    showToast('ورود به حالت دموی سریع انجام شد.', 'info');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
       <div className="w-full max-w-sm bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl shadow-2xl p-6 text-right animate-in zoom-in-95 duration-200">
@@ -90,7 +96,7 @@ export function LoginModal() {
 
             <button
               type="button"
-              onClick={loginAsDemo}
+              onClick={handleDemoLogin}
               className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-surface-2 dark:hover:bg-surface-elevated border border-slate-200 dark:border-border-strong text-slate-800 dark:text-slate-200 font-semibold flex items-center justify-center gap-1.5 transition text-[11px] shadow-2xs"
             >
               <span>🚀 مشاهده دموی سریع و بررسی رابط کاربری</span>

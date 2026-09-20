@@ -24,21 +24,51 @@ import {
   Radio, 
   Check, 
   Key, 
-  ExternalLink
+  ExternalLink,
+  Database,
+  Download,
+  Upload,
+  FileArchive
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
 import { alertingService } from '../../services/alerting.service.ts';
 import { remindersService } from '../../services/reminders.service.ts';
+import { backupService, BackupInspectResult } from '../../services/backup.service.ts';
+import { AssetType } from '../../services/asset-types.service.ts';
+import { Asset } from '../../services/assets.service.ts';
 
-export function SettingsView() {
+interface SettingsViewProps {
+  onDataRestored?: () => void;
+  assetTypes?: AssetType[];
+  assets?: Asset[];
+}
+
+export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsViewProps) {
   const { settings, updateSettings, resetSettings } = useSettings();
   const { showToast } = useToast();
 
-  const [activeCategory, setActiveCategory] = useState<'alerts' | 'quick_connect' | 'security' | 'appearance' | 'about'>('alerts');
+  const [activeCategory, setActiveCategory] = useState<'alerts' | 'backup' | 'quick_connect' | 'security' | 'appearance' | 'about'>('alerts');
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
   const [isDispatchingAll, setIsDispatchingAll] = useState(false);
   const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
+
+  // استیت‌های پشتیبان‌گیری
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportPassword, setExportPassword] = useState('');
+  const [includeSettings, setIncludeSettings] = useState(true);
+  const [includeUsers, setIncludeUsers] = useState(true);
+  const [showExportPassword, setShowExportPassword] = useState(false);
+
+  // استیت‌های بازیابی
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [inspectResult, setInspectResult] = useState<BackupInspectResult | null>(null);
+  const [isInspecting, setIsInspecting] = useState(false);
+  const [restorePassword, setRestorePassword] = useState('');
+  const [showRestorePassword, setShowRestorePassword] = useState(false);
+  const [restoreMode, setRestoreMode] = useState<'clean' | 'merge'>('clean');
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const toggleShowToken = (key: string) => {
     setShowTokens((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -86,6 +116,99 @@ export function SettingsView() {
       showToast(err.message || 'خطا در توزیع هشدارها', 'error');
     } finally {
       setIsDispatchingAll(false);
+    }
+  };
+
+  // تهیه و دانلود فایل پشتیبان با یک کلیک
+  const handleCreateBackup = async () => {
+    setIsExporting(true);
+    try {
+      const res = await backupService.exportBackup({
+        password: exportPassword,
+        includeSettings,
+        includeUsers,
+        assetTypes,
+        assets,
+      });
+      showToast(`فایل پشتیبان «${res.filename}» (${res.stats.assetTypesCount} دسته‌بندی و ${res.stats.assetsCount} دارایی) با موفقیت دانلود شد.`, 'success');
+      setExportPassword('');
+    } catch (err: any) {
+      showToast(err.message || 'خطا در ایجاد نسخه پشتیبان', 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // انتخاب فایل پشتیبان و اعتبارسنجی اولیه
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    setIsInspecting(true);
+    setInspectResult(null);
+    setRestorePassword('');
+
+    try {
+      const res = await backupService.inspectBackupFile(file);
+      setInspectResult(res);
+      if (res.requiresPassword) {
+        showToast('این فایل با رمز عبور محافظت شده است. لطفاً رمز عبور را وارد نمایید.', 'info');
+      } else if (!res.valid) {
+        showToast(res.error || 'فایل پشتیبان نامعتبر است.', 'error');
+      } else {
+        showToast(`فایل پشتیبان تأیید شد (${res.stats?.assetTypesCount} دسته، ${res.stats?.assetsCount} دارایی).`, 'success');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'خطا در بررسی فایل پشتیبان', 'error');
+    } finally {
+      setIsInspecting(false);
+    }
+  };
+
+  // رمزگشایی فایل پشتیبان در صورت نیاز به کلمه عبور
+  const handleDecryptAndInspect = async () => {
+    if (!selectedFile) return;
+    if (!restorePassword) {
+      showToast('لطفاً رمز عبور فایل را وارد کنید.', 'error');
+      return;
+    }
+
+    setIsInspecting(true);
+    try {
+      const res = await backupService.inspectBackupFile(selectedFile, restorePassword);
+      setInspectResult(res);
+      if (!res.valid) {
+        showToast(res.error || 'رمز عبور اشتباه است یا فایل مخدوش است.', 'error');
+      } else {
+        showToast(`رمزگشایی موفق! فایل شامل ${res.stats?.assetTypesCount} دسته و ${res.stats?.assetsCount} دارایی است.`, 'success');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'خطا در رمزگشایی فایل', 'error');
+    } finally {
+      setIsInspecting(false);
+    }
+  };
+
+  // اعمال نهایی بازیابی اطلاعات
+  const handleApplyRestore = async () => {
+    if (!inspectResult?.bundle) {
+      showToast('هیچ اطلاعات معتبری برای بازیابی یافت نشد.', 'error');
+      return;
+    }
+
+    setIsRestoring(true);
+    try {
+      const res = await backupService.applyRestore(inspectResult.bundle, { mode: restoreMode });
+      showToast(res.message, 'success');
+      setIsConfirmModalOpen(false);
+      setSelectedFile(null);
+      setInspectResult(null);
+      onDataRestored?.();
+    } catch (err: any) {
+      showToast(err.message || 'خطا در اعمال بازیابی اطلاعات', 'error');
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -141,6 +264,19 @@ export function SettingsView() {
             {settings.alerts.enableAlerts && (
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveCategory('backup')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+              activeCategory === 'backup'
+                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/30'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-surface-2'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            <span>پشتیبان‌گیری و بازیابی</span>
           </button>
 
           <button
@@ -864,6 +1000,263 @@ export function SettingsView() {
         )}
 
         {/* ======================================================== */}
+        {/* بخش: پشتیبان‌گیری و بازیابی یک‌کلیکی (Backup & Restore) */}
+        {/* ======================================================== */}
+        {activeCategory === 'backup' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* بنر معرفی پشتیبان‌گیری */}
+            <div className="p-5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-500/30 shadow-xs flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-indigo-600 text-white shrink-0 mt-0.5">
+                <Database className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  مدیریت پشتیبان‌گیری و بازیابی اطلاعات سامانه
+                </h2>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  امکان استخراج کامل کلیه دسته‌بندی‌ها، دارایی‌ها، کلمات عبور، مستندات، و تنظیمات سامانه در قالب فایل استاندارد یا بازیابی نسخه قبلی با یک کلیک.
+                </p>
+              </div>
+            </div>
+
+            {/* گرید ۲ ستونه: کارت ایجاد پشتیبان و کارت بازیابی */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              
+              {/* کارت ۱: تهیه و دانلود نسخه پشتیبان */}
+              <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-5">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                    <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Download className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">تهیه فایل پشتیبان (Export Backup)</h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">دانلود تمام داده‌ها در یک بسته ساخت‌یافته</p>
+                    </div>
+                  </div>
+
+                  {/* گزینه‌های پشتیبان‌گیری */}
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-surface-2 border border-slate-200 dark:border-border-strong space-y-2 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={includeSettings}
+                          onChange={(e) => setIncludeSettings(e.target.checked)}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                        />
+                        <span>شامل تنظیمات و اولویت‌های سامانه (وب‌هوک‌ها، تم و تراکم)</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={includeUsers}
+                          onChange={(e) => setIncludeUsers(e.target.checked)}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                        />
+                        <span>شامل حساب‌های کاربری و سطوح دسترسی</span>
+                      </label>
+                    </div>
+
+                    {/* رمزگذاری اختیاری */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          <Lock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <span>رمزگذاری فایل پشتیبان (اختیاری):</span>
+                        </label>
+                        {exportPassword && (
+                          <button
+                            type="button"
+                            onClick={() => setShowExportPassword(!showExportPassword)}
+                            className="text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center gap-1"
+                          >
+                            {showExportPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            <span>{showExportPassword ? 'مخفی' : 'نمایش'}</span>
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type={showExportPassword ? 'text' : 'password'}
+                        value={exportPassword}
+                        onChange={(e) => setExportPassword(e.target.value)}
+                        placeholder="کلمه عبور جهت رمزگذاری با AES-256-GCM..."
+                        dir="ltr"
+                        className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600"
+                      />
+                      <span className="text-[10px] text-slate-400 block leading-tight">
+                        در صورت تعیین رمز، فایل با پسوند <code className="text-indigo-600 font-mono">.daftar</code> رمزنگاری شده و باز کردن آن بدون رمز غیرممکن خواهد بود.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-border-subtle">
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={handleCreateBackup}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs shadow-emerald-600/30 transition disabled:opacity-50"
+                  >
+                    <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
+                    <span>{isExporting ? 'در حال آماده‌سازی و دانلود...' : 'تهیه و دانلود فایل پشتیبان (یک کلیک)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* کارت ۲: بازیابی اطلاعات از فایل */}
+              <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-5">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                    <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                      <Upload className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">بازیابی اطلاعات (Restore Backup)</h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">آپلود و اعمال نسخه پشتیبان به سیستم</p>
+                    </div>
+                  </div>
+
+                  {/* کادر بارگذاری فایل */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                      انتخاب یا کشیدن فایل پشتیبان (.json یا .daftar):
+                    </label>
+                    <div className="relative border-2 border-dashed border-slate-300 dark:border-border-strong rounded-xl p-4 text-center hover:border-indigo-500 transition cursor-pointer bg-slate-50/50 dark:bg-surface-2/40">
+                      <input
+                        type="file"
+                        accept=".json,.daftar"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <div className="flex flex-col items-center gap-1.5 pointer-events-none">
+                        <FileArchive className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {selectedFile ? selectedFile.name : 'کلیک یا کشیدن فایل به این قسمت'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} کیلوبایت` : 'فرمت‌های قابل قبول: json و daftar.'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* در صورت نیاز به رمزگشایی */}
+                  {inspectResult?.requiresPassword && (
+                    <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30 space-y-2 animate-in fade-in">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-300">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>این فایل رمزگذاری شده است. لطفاً رمز را وارد کنید:</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type={showRestorePassword ? 'text' : 'password'}
+                          value={restorePassword}
+                          onChange={(e) => setRestorePassword(e.target.value)}
+                          placeholder="رمز عبور فایل پشتیبان..."
+                          dir="ltr"
+                          className="flex-1 bg-white dark:bg-surface-1 border border-amber-300 dark:border-amber-500/50 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-slate-100"
+                        />
+                        <button
+                          type="button"
+                          disabled={isInspecting}
+                          onClick={handleDecryptAndInspect}
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition shrink-0"
+                        >
+                          {isInspecting ? 'در حال بررسی...' : 'رمزگشایی'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* پیش‌نمایش اطلاعات بسته تأییدشده */}
+                  {inspectResult?.valid && inspectResult.bundle && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/30 space-y-2.5 animate-in fade-in text-xs">
+                      <div className="flex items-center justify-between font-bold text-emerald-800 dark:text-emerald-300">
+                        <span className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>فایل پشتیبان معتبر و آماده بازیابی است</span>
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-200">
+                          نسخه {inspectResult.version}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center text-[11px] pt-1 font-semibold">
+                        <div className="p-2 rounded-lg bg-white dark:bg-surface-1 border border-emerald-200/60 dark:border-emerald-500/20">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">دسته‌بندی‌ها</span>
+                          <span className="text-slate-900 dark:text-white font-mono text-xs">{inspectResult.stats?.assetTypesCount}</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-white dark:bg-surface-1 border border-emerald-200/60 dark:border-emerald-500/20">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">تعداد دارایی‌ها</span>
+                          <span className="text-slate-900 dark:text-white font-mono text-xs">{inspectResult.stats?.assetsCount}</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-white dark:bg-surface-1 border border-emerald-200/60 dark:border-emerald-500/20">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">کاربران</span>
+                          <span className="text-slate-900 dark:text-white font-mono text-xs">{inspectResult.stats?.usersCount || 0}</span>
+                        </div>
+                      </div>
+
+                      {/* نحوه بازیابی */}
+                      <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-500/20 space-y-1.5">
+                        <span className="font-bold text-slate-700 dark:text-slate-300 block text-[11px]">حالت بازیابی:</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className={`p-2 rounded-lg border cursor-pointer flex items-center gap-1.5 text-[11px] transition ${
+                            restoreMode === 'clean'
+                              ? 'bg-indigo-50 border-indigo-600 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold'
+                              : 'bg-white dark:bg-surface-1 border-slate-200 dark:border-border-strong text-slate-600'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="restore_mode"
+                              value="clean"
+                              checked={restoreMode === 'clean'}
+                              onChange={() => setRestoreMode('clean')}
+                              className="hidden"
+                            />
+                            <span>جایگزینی کامل (Clean)</span>
+                          </label>
+
+                          <label className={`p-2 rounded-lg border cursor-pointer flex items-center gap-1.5 text-[11px] transition ${
+                            restoreMode === 'merge'
+                              ? 'bg-indigo-50 border-indigo-600 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 font-bold'
+                              : 'bg-white dark:bg-surface-1 border-slate-200 dark:border-border-strong text-slate-600'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="restore_mode"
+                              value="merge"
+                              checked={restoreMode === 'merge'}
+                              onChange={() => setRestoreMode('merge')}
+                              className="hidden"
+                            />
+                            <span>ادغام هوشمند (Merge)</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-border-subtle">
+                  <button
+                    type="button"
+                    disabled={!inspectResult?.valid || isRestoring}
+                    onClick={() => setIsConfirmModalOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs shadow-indigo-600/30 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>شروع عملیات بازیابی و اعمال داده‌ها</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
         {/* بخش ۲: دستورهای اتصال سریع و شبکه (Quick Connect) */}
         {/* ======================================================== */}
         {activeCategory === 'quick_connect' && (
@@ -1187,6 +1580,59 @@ export function SettingsView() {
         )}
 
       </div>
+
+      {/* مودال تأیید نهایی بازیابی اطلاعات */}
+      {isConfirmModalOpen && inspectResult?.bundle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150 text-right">
+          <div className="w-full max-w-md bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">تأیید نهایی بازیابی اطلاعات</h3>
+                <span className="text-xs text-rose-600 dark:text-rose-400">این عملیات داده‌های انتخابی را تغییر می‌دهد</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {restoreMode === 'clean' ? (
+                <>
+                  شما حالت <b>«جایگزینی کامل (Clean Overwrite)»</b> را انتخاب کرده‌اید. تمام داده‌های جاری سامانه پاک شده و با اطلاعات این نسخه پشتیبان جایگزین خواهند شد.
+                </>
+              ) : (
+                <>
+                  شما حالت <b>«ادغام هوشمند (Smart Merge)»</b> را انتخاب کرده‌اید. رکوردهای این فایل به سیستم اضافه یا به‌روزرسانی می‌شوند بدون اینکه داده‌های دیگر حذف شوند.
+                </>
+              )}
+            </p>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-surface-2 border border-slate-200 dark:border-border-strong text-xs space-y-1 font-mono">
+              <div>• دسته‌بندی‌ها: {inspectResult.stats?.assetTypesCount}</div>
+              <div>• دارایی‌ها: {inspectResult.stats?.assetsCount}</div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isRestoring}
+                onClick={() => setIsConfirmModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-border-strong text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-surface-2 transition"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={isRestoring}
+                onClick={handleApplyRestore}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+              >
+                {isRestoring ? 'در حال اعمال بازیابی...' : 'بله، بازیابی انجام شود'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { auditRoutes } from './routes/audit.routes.js';
 import { usersRoutes } from './routes/users.routes.js';
 import { attachmentsRoutes } from './routes/attachments.routes.js';
 import { alertsRoutes } from './routes/alerts.routes.js';
+import { backupRoutes } from './routes/backup.routes.js';
 
 export async function buildApp() {
   const app = fastify({
@@ -58,6 +59,7 @@ export async function buildApp() {
   await app.register(usersRoutes, { prefix: '/api/users' });
   await app.register(attachmentsRoutes, { prefix: '/api/attachments' });
   await app.register(alertsRoutes, { prefix: '/api/alerts' });
+  await app.register(backupRoutes, { prefix: '/api/backup' });
 
   return app;
 }

@@ -29,8 +29,8 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      // اگر توکن منقضی شده باشد
-      if (token && !endpoint.includes('/login') && !endpoint.includes('/setup')) {
+      // اگر توکن منقضی شده باشد (به جز حالت دموی لوکال)
+      if (token && token !== 'demo-token-preview' && !endpoint.includes('/login') && !endpoint.includes('/setup')) {
         localStorage.removeItem('daftar_token');
         localStorage.removeItem('daftar_user');
         window.dispatchEvent(new Event('auth:unauthorized'));

@@ -219,8 +219,16 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-start bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-[560px] max-w-full h-full bg-white dark:bg-surface-1 border-r border-slate-200 dark:border-border-strong shadow-2xl flex flex-col justify-between text-right">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex justify-start bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-[560px] max-w-full h-full bg-white dark:bg-surface-1 border-r border-slate-200 dark:border-border-strong shadow-2xl flex flex-col justify-between text-right cursor-default"
+      >
         {/* هدر کشو */}
         <div className="p-5 border-b border-slate-200 dark:border-border-subtle shrink-0">
           <div className="flex items-center justify-between">

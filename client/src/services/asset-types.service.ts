@@ -9,6 +9,7 @@ export interface FieldDefinition {
   type: FieldType;
   isRequired: boolean;
   isSecret?: boolean;
+  isCopyable?: boolean;
   options?: string[];
   showInTable?: boolean;
   order?: number;

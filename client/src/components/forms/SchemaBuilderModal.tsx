@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Plus, Trash2, Sliders } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Trash2, Sliders, Eye, EyeOff, Copy } from 'lucide-react';
 import { AssetType, FieldDefinition, FieldType, assetTypesService } from '../../services/asset-types.service.ts';
 import { useToast } from '../../context/ToastContext.tsx';
 
@@ -16,8 +16,19 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<FieldType>('text');
   const [newRequired, setNewRequired] = useState(false);
+  const [newShowInTable, setNewShowInTable] = useState(true);
+  const [newCopyable, setNewCopyable] = useState(false);
   const [newOptions, setNewOptions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // بستن مودال با کلید Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleAddField = () => {
     if (!newLabel || !newName) {
@@ -32,7 +43,8 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
       type: newType,
       isRequired: newRequired,
       isSecret: newType === 'secret',
-      showInTable: true,
+      showInTable: newShowInTable,
+      isCopyable: newCopyable,
       options: newType === 'select' ? newOptions.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
     };
 
@@ -41,6 +53,16 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
     setNewName('');
     setNewOptions('');
     setNewRequired(false);
+    setNewShowInTable(true);
+    setNewCopyable(false);
+  };
+
+  const handleToggleFieldTable = (id: string) => {
+    setFields(fields.map((f) => (f.id === id ? { ...f, showInTable: f.showInTable === false ? true : false } : f)));
+  };
+
+  const handleToggleFieldCopyable = (id: string) => {
+    setFields(fields.map((f) => (f.id === id ? { ...f, isCopyable: !f.isCopyable } : f)));
   };
 
   const handleRemoveField = (id: string) => {
@@ -71,8 +93,16 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-      <div className="w-full max-w-2xl bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl shadow-2xl p-6 text-right flex flex-col max-h-[90vh]">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl shadow-2xl p-6 text-right flex flex-col max-h-[90vh] cursor-default"
+      >
         {/* هدر */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-border-subtle shrink-0">
           <div className="flex items-center gap-2.5">
@@ -81,7 +111,7 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">مدیریت فیلدهای پویا: {assetType.name}</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">فیلدهای سفارشی مورد نیاز برای این دسته را تعریف کنید</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">فیلدهای سفارشی مورد نیاز، نمایش در جدول و دکمه کپی را تنظیم کنید</p>
             </div>
           </div>
           <button
@@ -94,7 +124,12 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
 
         {/* لیست فیلدهای موجود */}
         <div className="flex-1 overflow-y-auto py-4 space-y-2">
-          <div className="text-xs font-semibold text-slate-700 dark:text-slate-400 mb-2">فیلدهای فعلی ({fields.length}):</div>
+          <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 mb-2">
+            <span className="font-semibold">فیلدهای فعلی ({fields.length}):</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+              آیکون 👁️: نمایش در جدول | آیکون 📋: دکمه کپی
+            </span>
+          </div>
           {fields.map((f, idx) => (
             <div
               key={f.id}
@@ -113,13 +148,39 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => handleRemoveField(f.id)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-500 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition"
-                title="حذف فیلد"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleToggleFieldTable(f.id)}
+                  className={`p-1.5 rounded-lg transition ${
+                    f.showInTable !== false
+                      ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
+                  title={f.showInTable !== false ? 'نمایش در جدول (فعال)' : 'مخفی در جدول (غیرفعال)'}
+                >
+                  {f.showInTable !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleFieldCopyable(f.id)}
+                  className={`p-1.5 rounded-lg transition ${
+                    f.isCopyable
+                      ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
+                  title={f.isCopyable ? 'دکمه کپی در جدول (فعال)' : 'دکمه کپی در جدول (غیرفعال)'}
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleRemoveField(f.id)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-500 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition"
+                  title="حذف فیلد"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
 
@@ -172,16 +233,38 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 pt-5">
-                <input
-                  type="checkbox"
-                  id="req_check"
-                  checked={newRequired}
-                  onChange={(e) => setNewRequired(e.target.checked)}
-                  className="rounded border-slate-300 dark:border-border-strong bg-white dark:bg-surface-2 text-indigo-600 focus:ring-0 w-4 h-4"
-                />
-                <label htmlFor="req_check" className="text-slate-700 dark:text-slate-300 cursor-pointer font-medium">
-                  تکمیل این فیلد اجباری است
+              <div className="flex flex-wrap items-center gap-4 pt-5">
+                <label htmlFor="req_check" className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 cursor-pointer font-medium">
+                  <input
+                    type="checkbox"
+                    id="req_check"
+                    checked={newRequired}
+                    onChange={(e) => setNewRequired(e.target.checked)}
+                    className="rounded border-slate-300 dark:border-border-strong bg-white dark:bg-surface-2 text-indigo-600 focus:ring-0 w-4 h-4"
+                  />
+                  <span>اجباری</span>
+                </label>
+
+                <label htmlFor="table_check" className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 cursor-pointer font-medium">
+                  <input
+                    type="checkbox"
+                    id="table_check"
+                    checked={newShowInTable}
+                    onChange={(e) => setNewShowInTable(e.target.checked)}
+                    className="rounded border-slate-300 dark:border-border-strong bg-white dark:bg-surface-2 text-indigo-600 focus:ring-0 w-4 h-4"
+                  />
+                  <span>نمایش در جدول</span>
+                </label>
+
+                <label htmlFor="copy_check" className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 cursor-pointer font-medium">
+                  <input
+                    type="checkbox"
+                    id="copy_check"
+                    checked={newCopyable}
+                    onChange={(e) => setNewCopyable(e.target.checked)}
+                    className="rounded border-slate-300 dark:border-border-strong bg-white dark:bg-surface-2 text-indigo-600 focus:ring-0 w-4 h-4"
+                  />
+                  <span>دکمه کپی در جدول</span>
                 </label>
               </div>
             </div>

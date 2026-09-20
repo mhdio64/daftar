@@ -52,7 +52,7 @@ export function calculateDiff(
  */
 export async function logAudit(data: {
   userId: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'READ_SECRET' | 'LOGIN' | 'LOGOUT';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'READ_SECRET' | 'LOGIN' | 'LOGOUT' | 'EXPORT_BACKUP' | 'RESTORE_BACKUP';
   targetEntity: 'Asset' | 'AssetType' | 'User' | 'System' | 'Attachment';
   targetId: string;
   diff?: Record<string, any> | null;
