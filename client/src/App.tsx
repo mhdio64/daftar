@@ -28,6 +28,7 @@ import {
   Tag,
   RotateCcw,
   Network,
+  LayoutDashboard,
   X
 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ import { AuditLogsView } from './components/audit/AuditLogsView.tsx';
 import { SettingsView } from './components/settings/SettingsView.tsx';
 import { PasswordGeneratorModal } from './components/modals/PasswordGeneratorModal.tsx';
 import { TagBadge } from './components/common/TagBadge.tsx';
+import { ExecutiveDashboardView } from './components/dashboard/ExecutiveDashboardView.tsx';
 
 import { assetTypesService, AssetType } from './services/asset-types.service.ts';
 import { assetsService, Asset } from './services/assets.service.ts';
@@ -58,33 +60,24 @@ function checkAssetExpiry(asset: Asset): { hasExpiry: boolean; isExpired: boolea
   const dateVal = asset.expiryDate || asset.values?.expiry_date;
   if (!dateVal) return { hasExpiry: false, isExpired: false, isUrgent: false };
 
-  const str = String(dateVal).trim();
-  if (str.includes('روز دیگر') || str.includes('روز قبل')) {
-    const days = parseInt(str, 10);
-    if (!isNaN(days)) {
-      return {
-        hasExpiry: true,
-        isExpired: days < 0,
-        isUrgent: days <= 30 && days >= 0,
-      };
-    }
-  }
-
-  const parsedTime = Date.parse(str);
-  if (!isNaN(parsedTime)) {
-    const days = Math.ceil((parsedTime - Date.now()) / (1000 * 60 * 60 * 24));
-    return {
-      hasExpiry: true,
-      isExpired: days < 0,
-      isUrgent: days <= 30 && days >= 0,
-    };
-  }
-
-  if (str.includes('۱۴۰۴') || str.includes('1404')) {
+  // بررسی عبارات متنی دمو
+  if (typeof dateVal === 'string' && dateVal.includes('۷ روز دیگر')) {
     return { hasExpiry: true, isExpired: false, isUrgent: true };
   }
-  if (str.includes('۱۴۰۳') || str.includes('1403')) {
+
+  const expDate = new Date(dateVal);
+  if (isNaN(expDate.getTime())) {
+    return { hasExpiry: true, isExpired: false, isUrgent: false };
+  }
+
+  const now = new Date();
+  const diffDays = (expDate.getTime() - now.getTime()) / (1000 * 3600 * 24);
+
+  if (diffDays < 0) {
     return { hasExpiry: true, isExpired: true, isUrgent: false };
+  }
+  if (diffDays <= 7) {
+    return { hasExpiry: true, isExpired: false, isUrgent: true };
   }
 
   return { hasExpiry: true, isExpired: false, isUrgent: false };
@@ -96,7 +89,7 @@ function AppContent() {
   const { settings, updateSettings } = useSettings();
 
   // ناوبری و تب‌های اصلی
-  const [activeTab, setActiveTab] = useState<'assets' | 'reminders' | 'audit' | 'users' | 'settings'>('assets');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'assets' | 'reminders' | 'audit' | 'users' | 'settings'>('dashboard');
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [activeTypeId, setActiveTypeId] = useState<string | null>(null);
 
@@ -348,6 +341,9 @@ function AppContent() {
           { id: 'f_user', name: 'root_user', label: 'نام کاربری', type: 'text', isRequired: true, showInTable: true },
           { id: 'f_pass', name: 'root_password', label: 'رمز عبور Root', type: 'secret', isRequired: true, isSecret: true, showInTable: true },
           { id: 'f_os', name: 'os_type', label: 'سیستم عامل', type: 'select', options: ['Ubuntu 24.04', 'Debian 12', 'Rocky Linux 9'], isRequired: false, showInTable: true },
+          { id: 'f_cost', name: 'cost_amount', label: 'هزینه سرور', type: 'text', isRequired: false, showInTable: true },
+          { id: 'f_curr', name: 'cost_currency', label: 'ارز', type: 'select', options: ['تومان', 'دلار ($)', 'یورو (€)'], isRequired: false, showInTable: true },
+          { id: 'f_cycl', name: 'billing_cycle', label: 'دوره پرداخت', type: 'select', options: ['ماهانه', 'سالانه'], isRequired: false, showInTable: true },
           { id: 'f_exp', name: 'expiry_date', label: 'سررسید تمدید', type: 'jalali_date', isRequired: false, showInTable: true },
         ],
       },
@@ -377,6 +373,9 @@ function AppContent() {
         schemaDefinition: [
           { id: 'f_dn', name: 'domain_name', label: 'نام دامنه', type: 'text', isRequired: true, showInTable: true },
           { id: 'f_rg', name: 'registrar', label: 'شرکت ثبت‌کننده', type: 'text', isRequired: true, showInTable: true },
+          { id: 'f_cost', name: 'cost_amount', label: 'هزینه تمدید', type: 'text', isRequired: false, showInTable: true },
+          { id: 'f_curr', name: 'cost_currency', label: 'ارز', type: 'select', options: ['تومان', 'دلار ($)', 'یورو (€)'], isRequired: false, showInTable: true },
+          { id: 'f_cycl', name: 'billing_cycle', label: 'دوره پرداخت', type: 'select', options: ['ماهانه', 'سالانه'], isRequired: false, showInTable: true },
           { id: 'f_dx', name: 'expiry_date', label: 'تاریخ انقضا', type: 'jalali_date', isRequired: true, showInTable: true },
         ],
       },
@@ -392,6 +391,9 @@ function AppContent() {
           { id: 'f_sw', name: 'software_name', label: 'نام نرم‌افزار', type: 'text', isRequired: true, showInTable: true },
           { id: 'f_lk', name: 'license_key', label: 'کد لایسنس', type: 'secret', isRequired: true, isSecret: true, showInTable: true },
           { id: 'f_vn', name: 'vendor', label: 'ارائه‌دهنده', type: 'text', isRequired: false, showInTable: true },
+          { id: 'f_cost', name: 'cost_amount', label: 'مبلغ لایسنس', type: 'text', isRequired: false, showInTable: true },
+          { id: 'f_curr', name: 'cost_currency', label: 'ارز', type: 'select', options: ['تومان', 'دلار ($)', 'یورو (€)'], isRequired: false, showInTable: true },
+          { id: 'f_cycl', name: 'billing_cycle', label: 'دوره پرداخت', type: 'select', options: ['ماهانه', 'سالانه'], isRequired: false, showInTable: true },
           { id: 'f_lx', name: 'expiry_date', label: 'سررسید تمدید', type: 'jalali_date', isRequired: true, showInTable: true },
         ],
       },
@@ -459,12 +461,16 @@ function AppContent() {
               note: 'بکاپ روزانه در دیتاسنتر آلمان',
             },
           ],
+          expiryDate: new Date(Date.now() + 55 * 86400000).toISOString(),
           values: {
             ip_address: '192.168.10.15:22',
             ssh_port: '22',
             root_user: 'root',
             root_password: '••••••••',
             os_type: 'Ubuntu 24.04',
+            cost_amount: '4,500,000',
+            cost_currency: 'تومان',
+            billing_cycle: 'ماهانه',
             expiry_date: '۱۴۰۵/۰۲/۱۵',
           },
           docsMarkdown: `# راهنمای اتصال به سرور تهران\n- آی‌پی: 192.168.10.15\n- دستور اتصال SSH:\n\`ssh root@192.168.10.15 -p 22\``,
@@ -477,12 +483,16 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'لودبالانسر و پروکسی شبکه',
           tags: ['Production', 'شبکه', 'پروکسی'],
+          expiryDate: new Date(Date.now() + 180 * 86400000).toISOString(),
           values: {
             ip_address: '10.0.1.5:443',
             ssh_port: '2222',
             root_user: 'admin',
             root_password: '••••••••',
             os_type: 'Debian 12',
+            cost_amount: '1,800,000',
+            cost_currency: 'تومان',
+            billing_cycle: 'ماهانه',
             expiry_date: '۱۴۰۴/۱۲/۲۸',
           },
           createdAt: new Date().toISOString(),
@@ -494,6 +504,7 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'سرور بکاپ آلمان (Hetzner)',
           tags: ['Backup', 'Staging', 'آلمان'],
+          expiryDate: new Date(Date.now() + 6 * 86400000).toISOString(),
           relations: [
             {
               id: 'rel-3',
@@ -508,6 +519,9 @@ function AppContent() {
             root_user: 'backup_usr',
             root_password: '••••••••',
             os_type: 'Rocky Linux 9',
+            cost_amount: '38',
+            cost_currency: 'یورو (€)',
+            billing_cycle: 'ماهانه',
             expiry_date: '۷ روز دیگر',
           },
           createdAt: new Date().toISOString(),
@@ -555,9 +569,13 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'دامنه اصلی شرکت (company.ir)',
           tags: ['Production', 'برند اصلی'],
+          expiryDate: new Date(Date.now() + 320 * 86400000).toISOString(),
           values: {
             domain_name: 'company.ir',
             registrar: 'ایران‌سرور / ایرنیک',
+            cost_amount: '650,000',
+            cost_currency: 'تومان',
+            billing_cycle: 'سالانه',
             expiry_date: '۱۴۰۵/۰۶/۳۰',
           },
           createdAt: new Date().toISOString(),
@@ -569,9 +587,13 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'دامنه بین‌المللی برند (company.com)',
           tags: ['بین‌المللی', 'برند'],
+          expiryDate: new Date(Date.now() + 14 * 86400000).toISOString(),
           values: {
             domain_name: 'company.com',
             registrar: 'Namecheap',
+            cost_amount: '16',
+            cost_currency: 'دلار ($)',
+            billing_cycle: 'سالانه',
             expiry_date: '۱۴۰۴/۱۱/۱۵',
           },
           createdAt: new Date().toISOString(),
@@ -586,10 +608,14 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'لایسنس ابری JetBrains All Products',
           tags: ['Cloud', 'توسعه'],
+          expiryDate: new Date(Date.now() + 190 * 86400000).toISOString(),
           values: {
             software_name: 'JetBrains Toolbox',
             license_key: '••••••••',
             vendor: 'JetBrains s.r.o.',
+            cost_amount: '290',
+            cost_currency: 'دلار ($)',
+            billing_cycle: 'سالانه',
             expiry_date: '۱۴۰۵/۰۱/۲۰',
           },
           createdAt: new Date().toISOString(),
@@ -601,10 +627,14 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'اشتراک سالانه GitKraken Pro',
           tags: ['ابزار', 'توسعه'],
+          expiryDate: new Date(Date.now() - 2 * 86400000).toISOString(),
           values: {
             software_name: 'GitKraken Client',
             license_key: '••••••••',
             vendor: 'Axosoft',
+            cost_amount: '60',
+            cost_currency: 'دلار ($)',
+            billing_cycle: 'سالانه',
             expiry_date: '۱۴۰۴/۱۰/۰۱',
           },
           createdAt: new Date().toISOString(),
@@ -729,8 +759,32 @@ function AppContent() {
             </span>
           </div>
 
+          {/* دکمه داشبورد مدیریتی و آماری */}
+          <div className="p-3 pb-1">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                activeTab === 'dashboard'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 dark:bg-indigo-600 dark:text-white'
+                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-surface-2 dark:hover:text-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <LayoutDashboard className="w-4 h-4" />
+                <span>داشبورد مدیریتی</span>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                activeTab === 'dashboard'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
+              }`}>
+                آمار و بودجه
+              </span>
+            </button>
+          </div>
+
           {/* لیست دسته‌ها */}
-          <div className="p-3">
+          <div className="p-3 pt-2">
             <div className="flex items-center justify-between px-2 mb-2">
               <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">دسته‌بندی دارایی‌ها</span>
               {user?.role === 'ADMIN' && (
@@ -963,6 +1017,21 @@ function AppContent() {
             </div>
           </div>
         </header>
+
+        {/* نمای داشبورد آماری و مدیریتی دارایی‌ها */}
+        {activeTab === 'dashboard' && (
+          <ExecutiveDashboardView
+            assetTypes={assetTypes}
+            onNavigateToCategory={(typeId) => {
+              setActiveTypeId(typeId);
+              setActiveTab('assets');
+            }}
+            onSelectAsset={(asset) => {
+              setSelectedAsset(asset);
+              setIsDrawerOpen(true);
+            }}
+          />
+        )}
 
         {/* نمای سررسیدها */}
         {activeTab === 'reminders' && <RemindersView />}

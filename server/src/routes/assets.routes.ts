@@ -502,6 +502,115 @@ export async function assetsRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: err.message });
     }
   });
+
+  // دریافت خلاصه مدیریتی و آماری داشبورد (Executive Dashboard Summary)
+  app.get('/dashboard/summary', { preHandler: [requireAuth] }, async (request, reply) => {
+    const user = request.user!;
+
+    // تمام دسته‌ها و دارایی‌ها
+    const [assetTypes, allAssets] = await Promise.all([
+      prisma.assetType.findMany({ orderBy: { displayOrder: 'asc' } }),
+      prisma.asset.findMany({
+        include: {
+          assetType: {
+            select: { id: true, name: true, slug: true, icon: true },
+          },
+        },
+      }),
+    ]);
+
+    // فیلتر بر اساس دسترسی کاربر
+    const accessibleAssets = allAssets.filter((a) => canAccessCategory(user, a.assetTypeId));
+
+    // آمار به تفکیک دسته
+    const categoryStats = assetTypes.map((t) => {
+      const count = accessibleAssets.filter((a) => a.assetTypeId === t.id).length;
+      return {
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        icon: t.icon,
+        count,
+      };
+    });
+
+    // دارایی‌های نزدیک به انقضا (کمتر از ۳۰ روز یا منقضی‌شده)
+    const now = new Date();
+    const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+
+    const expiringAssets = accessibleAssets
+      .filter((a) => a.expiryDate && new Date(a.expiryDate) <= thirtyDaysLater)
+      .sort((a, b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime())
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        assetTypeId: a.assetTypeId,
+        assetTypeName: a.assetType?.name,
+        assetTypeIcon: a.assetType?.icon,
+        expiryDate: a.expiryDate,
+        isExpired: new Date(a.expiryDate!) < now,
+        daysRemaining: Math.ceil((new Date(a.expiryDate!).getTime() - now.getTime()) / (1000 * 3600 * 24)),
+      }));
+
+    // تحلیل هزینه‌ها
+    const costTotals: Record<string, { monthly: number; yearly: number }> = {
+      'تومان': { monthly: 0, yearly: 0 },
+      'دلار ($)': { monthly: 0, yearly: 0 },
+      'یورو (€)': { monthly: 0, yearly: 0 },
+    };
+
+    const costDrivers: any[] = [];
+
+    for (const a of accessibleAssets) {
+      const vals = (a.values as Record<string, any>) || {};
+      const rawCost = vals.cost_amount;
+      if (!rawCost) continue;
+
+      // تمیزکاری رقم هزینه
+      const numStr = String(rawCost).replace(/,/g, '').replace(/[^\d.]/g, '');
+      const num = parseFloat(numStr);
+      if (isNaN(num) || num <= 0) continue;
+
+      const curr = vals.cost_currency || 'تومان';
+      const cycle = vals.billing_cycle || 'ماهانه';
+
+      if (!costTotals[curr]) {
+        costTotals[curr] = { monthly: 0, yearly: 0 };
+      }
+
+      if (cycle === 'سالانه') {
+        costTotals[curr].yearly += num;
+        costTotals[curr].monthly += Math.round(num / 12);
+      } else {
+        costTotals[curr].monthly += num;
+        costTotals[curr].yearly += num * 12;
+      }
+
+      costDrivers.push({
+        id: a.id,
+        title: a.title,
+        assetTypeId: a.assetTypeId,
+        assetTypeName: a.assetType?.name,
+        assetTypeIcon: a.assetType?.icon,
+        amount: num,
+        formattedAmount: num.toLocaleString('fa-IR'),
+        currency: curr,
+        billingCycle: cycle,
+        monthlyNormalized: cycle === 'سالانه' ? Math.round(num / 12) : num,
+      });
+    }
+
+    costDrivers.sort((a, b) => b.monthlyNormalized - a.monthlyNormalized);
+
+    return {
+      totalAssets: accessibleAssets.length,
+      categoryStats,
+      expiringAssets,
+      costTotals,
+      costDrivers: costDrivers.slice(0, 10),
+    };
+  });
 }
+
 
 

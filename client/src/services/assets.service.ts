@@ -77,7 +77,45 @@ export interface AssetTimelineItem {
   createdAt: string;
 }
 
+export interface DashboardSummaryResponse {
+  totalAssets: number;
+  categoryStats: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    icon?: string;
+    count: number;
+  }>;
+  expiringAssets: Array<{
+    id: string;
+    title: string;
+    assetTypeId: string;
+    assetTypeName?: string;
+    assetTypeIcon?: string;
+    expiryDate: string;
+    isExpired: boolean;
+    daysRemaining: number;
+  }>;
+  costTotals: Record<string, { monthly: number; yearly: number }>;
+  costDrivers: Array<{
+    id: string;
+    title: string;
+    assetTypeId: string;
+    assetTypeName?: string;
+    assetTypeIcon?: string;
+    amount: number;
+    formattedAmount: string;
+    currency: string;
+    billingCycle: string;
+    monthlyNormalized: number;
+  }>;
+}
+
 export const assetsService = {
+  async getDashboardSummary(): Promise<DashboardSummaryResponse> {
+    return api.get<DashboardSummaryResponse>('/assets/dashboard/summary');
+  },
+
   async getAll(params: {
     assetTypeId?: string;
     search?: string;
