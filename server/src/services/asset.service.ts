@@ -29,6 +29,7 @@ export async function createAsset(params: {
   assetTypeId: string;
   title: string;
   inputValues: Record<string, any>;
+  tags?: string[];
   expiryDate?: Date | null;
   docsMarkdown?: string | null;
   ipAddress?: string;
@@ -54,6 +55,10 @@ export async function createAsset(params: {
     } else {
       normalValues[key] = value;
     }
+  }
+
+  if (params.tags && Array.isArray(params.tags)) {
+    normalValues.__tags = params.tags;
   }
 
   const asset = await prisma.asset.create({
@@ -95,6 +100,7 @@ export async function createAssetsBatch(params: {
   items: Array<{
     title: string;
     inputValues: Record<string, any>;
+    tags?: string[];
     expiryDate?: Date | null;
     docsMarkdown?: string | null;
   }>;
@@ -126,6 +132,10 @@ export async function createAssetsBatch(params: {
       } else {
         normalValues[key] = value;
       }
+    }
+
+    if (item.tags && Array.isArray(item.tags)) {
+      normalValues.__tags = item.tags;
     }
 
     const created = await prisma.asset.create({
@@ -167,6 +177,7 @@ export async function updateAsset(params: {
   userId: string;
   title?: string;
   inputValues?: Record<string, any>;
+  tags?: string[];
   expiryDate?: Date | null;
   docsMarkdown?: string | null;
   ipAddress?: string;
@@ -199,6 +210,10 @@ export async function updateAsset(params: {
         updatedNormal[key] = value;
       }
     }
+  }
+
+  if (params.tags !== undefined && Array.isArray(params.tags)) {
+    updatedNormal.__tags = params.tags;
   }
 
   // محاسبه لاگ تفاوت‌ها
@@ -284,6 +299,14 @@ export async function revealSecret(params: {
 export function formatAssetForClient(asset: any, secretKeys: string[]) {
   const normalValues = (asset.values as Record<string, any>) || {};
   const maskedValues = { ...normalValues };
+  const tags: string[] = Array.isArray(normalValues.__tags)
+    ? normalValues.__tags
+    : Array.isArray(asset.tags)
+    ? asset.tags
+    : [];
+
+  // حذف فیلد داخلی __tags از values برای حفظ خلوص فیلدهای داینامیک اسکیما
+  delete maskedValues.__tags;
 
   // اضافه کردن مقادیر ماسک شده برای فیلدهای محرمانه
   for (const key of secretKeys) {
@@ -297,7 +320,140 @@ export function formatAssetForClient(asset: any, secretKeys: string[]) {
 
   return {
     ...asset,
+    tags,
     values: maskedValues,
     encryptedValues: undefined, // هرگز هش‌ها و تگ‌های رمزنگاری شده به کلاینت فرستاده نمی‌شوند
   };
 }
+
+/**
+ * دریافت تاریخچه تغییرات و نسخه‌بندی یک دارایی
+ */
+export async function getAssetTimeline(assetId: string) {
+  const asset = await prisma.asset.findUnique({
+    where: { id: assetId },
+    select: { id: true, assetTypeId: true, title: true },
+  });
+
+  if (!asset) {
+    throw new Error('دارایی مورد نظر یافت نشد.');
+  }
+
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      targetEntity: 'Asset',
+      targetId: assetId,
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          username: true,
+          role: true,
+        },
+      },
+    },
+  });
+
+  return logs;
+}
+
+/**
+ * بازگردانی دارایی به نسخه پیش از یک تغییر خاص (Rollback)
+ */
+export async function rollbackAsset(params: {
+  assetId: string;
+  logId: string;
+  userId: string;
+  ipAddress?: string;
+  userAgent?: string;
+}) {
+  const asset = await prisma.asset.findUnique({
+    where: { id: params.assetId },
+    include: { assetType: true },
+  });
+
+  if (!asset) {
+    throw new Error('دارایی مورد نظر یافت نشد.');
+  }
+
+  const targetLog = await prisma.auditLog.findUnique({
+    where: { id: params.logId },
+  });
+
+  if (!targetLog || targetLog.targetId !== params.assetId) {
+    throw new Error('رکورد تاریخچه تغییرات معتبر نیست.');
+  }
+
+  if (!targetLog.diff || typeof targetLog.diff !== 'object') {
+    throw new Error('این رکورد تاریخچه حاوی مقادیر قابل بازگردانی نیست.');
+  }
+
+  const diff = targetLog.diff as Record<string, any>;
+  const secretKeys = getSecretKeysFromSchema(asset.assetType.schemaDefinition);
+
+  const restorableEntries = Object.entries(diff).filter(
+    ([k, v]) => v && typeof v === 'object' && 'old' in v && !secretKeys.includes(k)
+  );
+
+  if (restorableEntries.length === 0) {
+    throw new Error('این رکورد دارای مقادیر پیشین قابل بازگردانی نمی‌باشد.');
+  }
+
+  const currentValues = (asset.values as Record<string, any>) || {};
+  const restoredValues = { ...currentValues };
+  let restoredTitle = asset.title;
+
+  for (const [key, change] of restorableEntries) {
+    if (key === 'title') {
+      if (change.old) {
+        restoredTitle = String(change.old);
+      }
+    } else if (key === '__tags' || key === 'tags') {
+      if (Array.isArray(change.old)) {
+        restoredValues.__tags = change.old;
+      }
+    } else {
+      if (change.old === null || change.old === undefined) {
+        delete restoredValues[key];
+      } else {
+        restoredValues[key] = change.old;
+      }
+    }
+  }
+
+  // محاسبه تغییرات ناشی از بازگردانی
+  const rollbackDiff = calculateDiff(currentValues, restoredValues, secretKeys);
+  if (restoredTitle !== asset.title) {
+    rollbackDiff['title'] = { old: asset.title, new: restoredTitle };
+  }
+
+  const updated = await prisma.asset.update({
+    where: { id: params.assetId },
+    data: {
+      title: restoredTitle,
+      values: restoredValues,
+      updatedById: params.userId,
+    },
+    include: { assetType: true },
+  });
+
+  // ثبت رویداد بازگردانی در ممیزی
+  await logAudit({
+    userId: params.userId,
+    action: 'UPDATE',
+    targetEntity: 'Asset',
+    targetId: updated.id,
+    diff: {
+      ...rollbackDiff,
+      __actionType: { old: null, new: 'ROLLBACK', note: `بازگردانی تغییرات به نسخه پیشین (Log: ${params.logId})` },
+    },
+    ipAddress: params.ipAddress,
+    userAgent: params.userAgent,
+  });
+
+  return formatAssetForClient(updated, secretKeys);
+}
+

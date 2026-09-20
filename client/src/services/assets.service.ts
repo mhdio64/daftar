@@ -7,6 +7,7 @@ export interface Asset {
   assetType: AssetType;
   title: string;
   values: Record<string, any>;
+  tags?: string[];
   expiryDate?: string | null;
   docsMarkdown?: string | null;
   createdAt: string;
@@ -21,6 +22,32 @@ export interface AssetsResponse {
     total: number;
     totalPages: number;
   };
+}
+
+export interface AssetTimelineUser {
+  id: string;
+  fullName: string;
+  username: string;
+  role: string;
+}
+
+export interface AssetDiffEntry {
+  old?: any;
+  new?: any;
+  note?: string;
+}
+
+export interface AssetTimelineItem {
+  id: string;
+  userId: string;
+  user: AssetTimelineUser;
+  action: string;
+  targetEntity: string;
+  targetId: string;
+  diff?: Record<string, AssetDiffEntry | any> | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
 }
 
 export const assetsService = {
@@ -47,6 +74,7 @@ export const assetsService = {
     assetTypeId: string;
     title: string;
     values: Record<string, any>;
+    tags?: string[];
     expiryDate?: string | null;
     docsMarkdown?: string | null;
   }): Promise<Asset> {
@@ -58,6 +86,7 @@ export const assetsService = {
     data: {
       title?: string;
       values?: Record<string, any>;
+      tags?: string[];
       expiryDate?: string | null;
       docsMarkdown?: string | null;
     }
@@ -74,6 +103,7 @@ export const assetsService = {
     items: Array<{
       title: string;
       inputValues: Record<string, any>;
+      tags?: string[];
       expiryDate?: string | null;
       docsMarkdown?: string | null;
     }>;
@@ -84,4 +114,13 @@ export const assetsService = {
   async revealSecret(assetId: string, fieldKey: string): Promise<{ fieldKey: string; value: string }> {
     return api.post<{ fieldKey: string; value: string }>(`/assets/${assetId}/reveal-secret`, { fieldKey });
   },
+
+  async getTimeline(assetId: string): Promise<AssetTimelineItem[]> {
+    return api.get<AssetTimelineItem[]>(`/assets/${assetId}/timeline`);
+  },
+
+  async rollback(assetId: string, logId: string): Promise<Asset> {
+    return api.post<Asset>(`/assets/${assetId}/rollback`, { logId });
+  },
 };
+

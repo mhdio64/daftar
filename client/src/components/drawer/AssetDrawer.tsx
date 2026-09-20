@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, FileText, Settings, Paperclip, Copy, Check, Edit3, Eye, EyeOff } from 'lucide-react';
+import { X, Save, Trash2, FileText, Settings, Paperclip, Copy, Check, Edit3, Eye, EyeOff, Tag, History } from 'lucide-react';
 import { Asset, assetsService } from '../../services/assets.service.ts';
 import { AssetType } from '../../services/asset-types.service.ts';
 import { DynamicForm } from '../forms/DynamicForm.tsx';
 import { AttachmentsManager } from '../common/AttachmentsManager.tsx';
 import { QuickConnectBox } from '../common/QuickConnectBox.tsx';
+import { TagBadge } from '../common/TagBadge.tsx';
+import { TagInput } from '../common/TagInput.tsx';
+import { AssetTimelineView } from './AssetTimelineView.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
 
 interface AssetDrawerProps {
@@ -19,9 +22,10 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
   const { showToast } = useToast();
   const isNew = !asset;
 
-  const [activeTab, setActiveTab] = useState<'props' | 'docs' | 'files'>('props');
+  const [activeTab, setActiveTab] = useState<'props' | 'docs' | 'files' | 'history'>('props');
   const [title, setTitle] = useState(asset?.title || '');
   const [formValues, setFormValues] = useState<Record<string, any>>(() => asset?.values || {});
+  const [tags, setTags] = useState<string[]>(() => asset?.tags || []);
   const [docsMarkdown, setDocsMarkdown] = useState(asset?.docsMarkdown || '');
   const [isMarkdownEditing, setIsMarkdownEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -37,11 +41,13 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
     if (asset) {
       setTitle(asset.title);
       setFormValues(asset.values || {});
+      setTags(asset.tags || []);
       setDocsMarkdown(asset.docsMarkdown || '');
       setIsEditing(false); // دارایی‌های موجود در حالت مشاهده باز می‌شوند
     } else {
       setTitle('');
       setFormValues({});
+      setTags([]);
       setDocsMarkdown('');
       setIsEditing(true); // دارایی جدید مستقیماً در حالت ویرایش باز می‌شود
     }
@@ -131,6 +137,13 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
     }
   };
 
+  const handleRollbackSuccess = (updatedAsset: Asset) => {
+    setTitle(updatedAsset.title);
+    setFormValues(updatedAsset.values || {});
+    setTags(updatedAsset.tags || []);
+    onSaved(updatedAsset);
+  };
+
   const handleCancelEdit = () => {
     if (isNew) {
       onClose();
@@ -138,6 +151,7 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
       if (asset) {
         setTitle(asset.title);
         setFormValues(asset.values || {});
+        setTags(asset.tags || []);
       }
       setIsEditing(false);
     }
@@ -156,6 +170,7 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
           assetTypeId: assetType.id,
           title: title.trim(),
           values: formValues,
+          tags: tags,
           docsMarkdown: docsMarkdown || undefined,
         });
         showToast('دارایی جدید با موفقیت ثبت شد.', 'success');
@@ -165,6 +180,7 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
         const updated = await assetsService.update(asset.id, {
           title: title.trim(),
           values: formValues,
+          tags: tags,
           docsMarkdown: docsMarkdown || undefined,
         });
         showToast('تغییرات با موفقیت ذخیره شد.', 'success');
@@ -179,6 +195,7 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
         assetType,
         title: title.trim(),
         values: formValues,
+        tags: tags,
         docsMarkdown: docsMarkdown || undefined,
         createdAt: asset?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -307,6 +324,21 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
               <Paperclip className="w-3.5 h-3.5" />
               <span>فایل‌های پیوست</span>
             </button>
+
+            {!isNew && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('history')}
+                className={`pb-3 font-semibold transition border-b-2 flex items-center gap-1.5 ${
+                  activeTab === 'history'
+                    ? 'text-indigo-600 border-indigo-600 dark:text-indigo-400 dark:border-indigo-500'
+                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white border-transparent'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>تاریخچه تغییرات</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -350,6 +382,37 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
                     <div className="text-sm font-bold text-slate-900 dark:text-white">
                       {title || <span className="text-slate-400 font-normal italic">بدون عنوان</span>}
                     </div>
+                  </div>
+
+                  {/* بخش برچسب‌ها و نشان‌ها در حالت مشاهده */}
+                  <div className="p-3.5 rounded-xl border border-slate-200 dark:border-border-strong bg-white dark:bg-surface-1 shadow-2xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <span>برچسب‌ها و نشان‌ها (Labels & Tags)</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('props');
+                          setIsEditing(true);
+                        }}
+                        className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                      >
+                        ویرایش برچسب‌ها
+                      </button>
+                    </div>
+                    {tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.map((t) => (
+                          <TagBadge key={t} tag={t} size="sm" showIcon />
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-slate-500 italic block">
+                        هنوز برچسبی برای این دارایی ثبت نشده است.
+                      </span>
+                    )}
                   </div>
 
                   {/* کارت‌های فیلدهای داینامیک */}
@@ -473,6 +536,18 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
                     />
                   </div>
 
+                  {/* بخش انتخاب و مدیریت برچسب‌ها در حالت ویرایش */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                      برچسب‌ها و نشان‌ها (Tags & Labels)
+                    </label>
+                    <TagInput
+                      tags={tags}
+                      onChange={setTags}
+                      placeholder="برچسب جدید را تایپ کرده و Enter بزنید..."
+                    />
+                  </div>
+
                   {/* رندر خودکار فرم فیلدهای داینامیک */}
                   <DynamicForm
                     schema={assetType.schemaDefinition}
@@ -537,6 +612,21 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
                 assetId={asset?.id}
                 assetTypeId={assetType.id}
                 title={title || assetType.name}
+              />
+            </div>
+          )}
+
+          {activeTab === 'history' && asset && (
+            <div className="py-1">
+              <AssetTimelineView
+                asset={{
+                  ...asset,
+                  title,
+                  values: formValues,
+                  tags,
+                }}
+                assetType={assetType}
+                onRollbackSuccess={handleRollbackSuccess}
               />
             </div>
           )}

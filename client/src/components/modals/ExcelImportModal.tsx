@@ -342,7 +342,16 @@ export function ExcelImportModal({
                               )}
                             </td>
                             <td className="p-2.5 font-semibold text-slate-900 dark:text-slate-100">
-                              {row.title}
+                              <div>{row.title}</div>
+                              {row.tags && row.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {row.tags.map((t) => (
+                                    <span key={t} className="px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 text-[10px] font-medium">
+                                      #{t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td className="p-2.5 text-slate-600 dark:text-slate-300">
                               <div className="flex flex-wrap gap-1 max-w-sm">

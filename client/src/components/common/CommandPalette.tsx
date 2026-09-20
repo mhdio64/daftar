@@ -46,6 +46,8 @@ function getCategoryIcon(iconName: string | undefined, typeId: string) {
   return <Database className="w-4 h-4" />;
 }
 
+import { TagBadge } from './TagBadge.tsx';
+
 // پایگاه داده جامع دارایی‌های دمو جهت جستجوی بلادرنگ در تمام دسته‌بندی‌ها
 const DEFAULT_SEARCH_POOL: Asset[] = [
   {
@@ -53,6 +55,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'vps',
     assetType: { id: 'vps', name: 'سرورهای مجازی (VPS)', slug: 'vps', icon: 'Server', schemaDefinition: [], displayOrder: 1 },
     title: 'سرور اصلی دیتاسنتر تهران',
+    tags: ['Production', 'اصلی', 'Critical'],
     values: {
       ip_address: '192.168.10.15:22',
       ssh_port: '22',
@@ -70,6 +73,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'vps',
     assetType: { id: 'vps', name: 'سرورهای مجازی (VPS)', slug: 'vps', icon: 'Server', schemaDefinition: [], displayOrder: 1 },
     title: 'لودبالانسر و پروکسی شبکه',
+    tags: ['Production', 'شبکه', 'پروکسی'],
     values: {
       ip_address: '10.0.1.5:443',
       ssh_port: '2222',
@@ -86,6 +90,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'vps',
     assetType: { id: 'vps', name: 'سرورهای مجازی (VPS)', slug: 'vps', icon: 'Server', schemaDefinition: [], displayOrder: 1 },
     title: 'سرور بکاپ آلمان (Hetzner)',
+    tags: ['Backup', 'Staging', 'آلمان'],
     values: {
       ip_address: '89.144.20.12',
       ssh_port: '22',
@@ -102,6 +107,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'email',
     assetType: { id: 'email', name: 'ایمیل‌های سازمانی', slug: 'email', icon: 'Mail', schemaDefinition: [], displayOrder: 2 },
     title: 'ایمیل رسمی مدیر عامل',
+    tags: ['مدیریت', 'Internal'],
     values: {
       email_address: 'ceo@company.ir',
       password: '••••••••',
@@ -116,6 +122,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'email',
     assetType: { id: 'email', name: 'ایمیل‌های سازمانی', slug: 'email', icon: 'Mail', schemaDefinition: [], displayOrder: 2 },
     title: 'ایمیل دپارتمان مالی',
+    tags: ['مالی', 'Internal'],
     values: {
       email_address: 'finance@company.ir',
       password: '••••••••',
@@ -130,6 +137,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'domains',
     assetType: { id: 'domains', name: 'دامنه‌ها و DNS', slug: 'domains', icon: 'Globe', schemaDefinition: [], displayOrder: 3 },
     title: 'دامنه اصلی شرکت (company.ir)',
+    tags: ['Production', 'برند اصلی'],
     values: {
       domain_name: 'company.ir',
       registrar: 'ایران‌سرور / ایرنیک',
@@ -143,6 +151,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'domains',
     assetType: { id: 'domains', name: 'دامنه‌ها و DNS', slug: 'domains', icon: 'Globe', schemaDefinition: [], displayOrder: 3 },
     title: 'دامنه بین‌المللی برند (company.com)',
+    tags: ['بین‌المللی', 'برند'],
     values: {
       domain_name: 'company.com',
       registrar: 'Namecheap',
@@ -156,6 +165,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'licenses',
     assetType: { id: 'licenses', name: 'لایسنس نرم‌افزارها', slug: 'licenses', icon: 'Key', schemaDefinition: [], displayOrder: 4 },
     title: 'لایسنس ابری JetBrains All Products',
+    tags: ['Cloud', 'توسعه'],
     values: {
       software_name: 'JetBrains Toolbox',
       license_key: '••••••••',
@@ -170,6 +180,7 @@ const DEFAULT_SEARCH_POOL: Asset[] = [
     assetTypeId: 'licenses',
     assetType: { id: 'licenses', name: 'لایسنس نرم‌افزارها', slug: 'licenses', icon: 'Key', schemaDefinition: [], displayOrder: 4 },
     title: 'اشتراک سالانه GitKraken Pro',
+    tags: ['ابزار', 'توسعه'],
     values: {
       software_name: 'GitKraken Client',
       license_key: '••••••••',
@@ -296,13 +307,14 @@ export function CommandPalette({ isOpen, onClose, onSelectAsset, assetTypes, cur
           const titleNorm = normalizeText(asset.title);
           const categoryNorm = normalizeText(asset.assetType?.name);
           const docsNorm = normalizeText(asset.docsMarkdown);
+          const tagsNorm = (asset.tags || []).map(normalizeText).join(' ');
 
           // بررسی کلیه مقادیر فیلدها
           const valuesNorm = Object.values(asset.values || {})
             .map((v) => normalizeText(String(v || '')))
             .join(' ');
 
-          const fullSearchTarget = `${titleNorm} ${categoryNorm} ${docsNorm} ${valuesNorm}`;
+          const fullSearchTarget = `${titleNorm} ${categoryNorm} ${docsNorm} ${tagsNorm} ${valuesNorm}`;
 
           // تمام توکن‌های جستجو باید در رکورد یافت شوند
           return searchTokens.every((token) => fullSearchTarget.includes(token));
@@ -411,7 +423,7 @@ export function CommandPalette({ isOpen, onClose, onSelectAsset, assetTypes, cur
                       <div className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition truncate">
                         {asset.title}
                       </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
                         <span className="font-medium text-indigo-600 dark:text-indigo-400">
                           {asset.assetType?.name || asset.assetTypeId}
                         </span>
@@ -428,6 +440,13 @@ export function CommandPalette({ isOpen, onClose, onSelectAsset, assetTypes, cur
                           </>
                         )}
                       </div>
+                      {asset.tags && asset.tags.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          {asset.tags.map((t) => (
+                            <TagBadge key={t} tag={t} size="xs" />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 

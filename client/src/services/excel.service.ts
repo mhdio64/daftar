@@ -6,6 +6,7 @@ export interface ParsedRow {
   rowNumber: number;
   title: string;
   inputValues: Record<string, any>;
+  tags?: string[];
   isValid: boolean;
   errors: string[];
 }
@@ -24,9 +25,10 @@ export interface ExcelParseResult {
 export function downloadExcelTemplate(assetType: AssetType): void {
   const schema = assetType.schemaDefinition || [];
 
-  const headers = ['عنوان دارایی *'];
+  const headers = ['عنوان دارایی *', 'برچسب‌ها (Tags)'];
   const sampleRow: Record<string, any> = {
     'عنوان دارایی *': `نمونه ${assetType.name} ۱`,
+    'برچسب‌ها (Tags)': 'Production, اصلی',
   };
 
   for (const field of schema) {
@@ -73,12 +75,13 @@ export function downloadExcelTemplate(assetType: AssetType): void {
  */
 export function exportAssetsToExcel(assetType: AssetType, assets: Asset[]): void {
   const schema = assetType.schemaDefinition || [];
-  const headers = ['ردیف', 'عنوان دارایی', ...schema.map((f) => f.label), 'تاریخ ایجاد'];
+  const headers = ['ردیف', 'عنوان دارایی', 'برچسب‌ها', ...schema.map((f) => f.label), 'تاریخ ایجاد'];
 
   const rows = assets.map((asset, index) => {
     const row: Record<string, any> = {
       'ردیف': index + 1,
       'عنوان دارایی': asset.title,
+      'برچسب‌ها': Array.isArray(asset.tags) && asset.tags.length > 0 ? asset.tags.join('، ') : '—',
     };
 
     for (const field of schema) {
@@ -141,6 +144,7 @@ export async function parseAndValidateExcel(
   // پشتیبانی از عنوان فارسی، عنوان فارسی ستاره‌دار و کلید انگلیسی
   const fieldMapping: Record<string, string> = {}; // rawHeader -> field.name
   let titleHeader = '';
+  let tagsHeader = '';
 
   for (const header of rawHeaders) {
     const cleaned = cleanHeader(header);
@@ -153,6 +157,21 @@ export async function parseAndValidateExcel(
       cleaned === 'نام دارایی'
     ) {
       titleHeader = header;
+      continue;
+    }
+
+    // بررسی اینکه آیا این ستون برای برچسب‌ها است
+    if (
+      cleaned === 'برچسب' ||
+      cleaned === 'برچسب ها' ||
+      cleaned === 'برچسب‌ها' ||
+      cleaned === 'برچسبها' ||
+      cleaned === 'tags' ||
+      cleaned === 'tag' ||
+      cleaned.includes('برچسب') ||
+      cleaned.includes('tag')
+    ) {
+      tagsHeader = header;
       continue;
     }
 
@@ -205,6 +224,9 @@ export async function parseAndValidateExcel(
       rowNumber,
       title: rawTitle || `ردیف شماره ${rowNumber}`,
       inputValues,
+      tags: tagsHeader && raw[tagsHeader] 
+        ? String(raw[tagsHeader]).split(/[,،]+/).map((t) => t.trim()).filter(Boolean)
+        : [],
       isValid: errors.length === 0,
       errors,
     };

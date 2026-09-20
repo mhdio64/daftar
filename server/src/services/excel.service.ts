@@ -21,9 +21,10 @@ export function generateExcelTemplate(assetType: AssetTypeWithSchema): Buffer {
   const schema = Array.isArray(assetType.schemaDefinition) ? assetType.schemaDefinition : [];
 
   // ساخت سرستون‌ها با نشانگر ستاره برای فیلدهای اجباری
-  const headers = ['عنوان دارایی *'];
+  const headers = ['عنوان دارایی *', 'برچسب‌ها (Tags)'];
   const sampleRow: Record<string, string> = {
     'عنوان دارایی *': `نمونه ${assetType.name} ۱`,
+    'برچسب‌ها (Tags)': 'Production, اصلی',
   };
 
   for (const field of schema) {
@@ -70,12 +71,13 @@ export function generateExcelTemplate(assetType: AssetTypeWithSchema): Buffer {
 export function generateAssetsExcel(assetType: AssetTypeWithSchema, assets: any[]): Buffer {
   const schema = Array.isArray(assetType.schemaDefinition) ? assetType.schemaDefinition : [];
 
-  const headers = ['ردیف', 'عنوان دارایی', ...schema.map((f) => f.label), 'تاریخ ایجاد'];
+  const headers = ['ردیف', 'عنوان دارایی', 'برچسب‌ها', ...schema.map((f) => f.label), 'تاریخ ایجاد'];
 
   const rows = assets.map((asset, index) => {
     const row: Record<string, any> = {
       'ردیف': index + 1,
       'عنوان دارایی': asset.title,
+      'برچسب‌ها': Array.isArray(asset.tags) && asset.tags.length > 0 ? asset.tags.join('، ') : '—',
     };
 
     for (const field of schema) {

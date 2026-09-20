@@ -23,7 +23,11 @@ import {
   Sun,
   Moon,
   Settings,
-  KeyRound
+  KeyRound,
+  Filter,
+  Tag,
+  RotateCcw,
+  X
 } from 'lucide-react';
 
 import { ToastProvider, useToast } from './context/ToastContext.tsx';
@@ -42,10 +46,48 @@ import { UsersView } from './components/users/UsersView.tsx';
 import { AuditLogsView } from './components/audit/AuditLogsView.tsx';
 import { SettingsView } from './components/settings/SettingsView.tsx';
 import { PasswordGeneratorModal } from './components/modals/PasswordGeneratorModal.tsx';
+import { TagBadge } from './components/common/TagBadge.tsx';
 
 import { assetTypesService, AssetType } from './services/asset-types.service.ts';
 import { assetsService, Asset } from './services/assets.service.ts';
 import { exportAssetsToExcel, ParsedRow } from './services/excel.service.ts';
+
+// بررسی وضعیت سررسید دارایی جهت فیلتر هوشمند
+function checkAssetExpiry(asset: Asset): { hasExpiry: boolean; isExpired: boolean; isUrgent: boolean } {
+  const dateVal = asset.expiryDate || asset.values?.expiry_date;
+  if (!dateVal) return { hasExpiry: false, isExpired: false, isUrgent: false };
+
+  const str = String(dateVal).trim();
+  if (str.includes('روز دیگر') || str.includes('روز قبل')) {
+    const days = parseInt(str, 10);
+    if (!isNaN(days)) {
+      return {
+        hasExpiry: true,
+        isExpired: days < 0,
+        isUrgent: days <= 30 && days >= 0,
+      };
+    }
+  }
+
+  const parsedTime = Date.parse(str);
+  if (!isNaN(parsedTime)) {
+    const days = Math.ceil((parsedTime - Date.now()) / (1000 * 60 * 60 * 24));
+    return {
+      hasExpiry: true,
+      isExpired: days < 0,
+      isUrgent: days <= 30 && days >= 0,
+    };
+  }
+
+  if (str.includes('۱۴۰۴') || str.includes('1404')) {
+    return { hasExpiry: true, isExpired: false, isUrgent: true };
+  }
+  if (str.includes('۱۴۰۳') || str.includes('1403')) {
+    return { hasExpiry: true, isExpired: true, isUrgent: false };
+  }
+
+  return { hasExpiry: true, isExpired: false, isUrgent: false };
+}
 
 function AppContent() {
   const { user, token, setupNeeded, isLoading, logout } = useAuth();
@@ -88,6 +130,103 @@ function AppContent() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [categoryViewTab, setCategoryViewTab] = useState<'grid' | 'wiki'>('grid');
 
+  // استیت‌های فیلتر پیشرفته و سیستم برچسب‌ها
+  const [filterSearch, setFilterSearch] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagFilterMode, setTagFilterMode] = useState<'AND' | 'OR'>('OR');
+  const [expiryStatusFilter, setExpiryStatusFilter] = useState<'all' | 'has_expiry' | 'urgent' | 'expired'>('all');
+
+  // ریست فیلترها هنگام تعویض دسته‌بندی
+  useEffect(() => {
+    setFilterSearch('');
+    setSelectedTags([]);
+    setExpiryStatusFilter('all');
+  }, [activeTypeId]);
+
+  // استخراج تمام برچسب‌های موجود در دسته جاری به همراه تعداد
+  const availableTagsWithCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of assets) {
+      if (Array.isArray(a.tags)) {
+        for (const t of a.tags) {
+          const clean = t.trim();
+          if (clean) {
+            counts.set(clean, (counts.get(clean) || 0) + 1);
+          }
+        }
+      }
+    }
+    return Array.from(counts.entries()).map(([tag, count]) => ({ tag, count }));
+  }, [assets]);
+
+  // دارایی‌های فیلتر شده بر اساس متن، برچسب‌ها و وضعیت سررسید
+  const filteredAssets = useMemo(() => {
+    return assets.filter((asset) => {
+      // ۱. فیلتر متنی (جستجو در عنوان، برچسب‌ها و کلیه فیلدها)
+      if (filterSearch.trim()) {
+        const q = filterSearch.trim().toLowerCase();
+        const titleMatch = (asset.title || '').toLowerCase().includes(q);
+        const tagsMatch = (asset.tags || []).some((t) => t.toLowerCase().includes(q));
+        const valuesMatch = Object.values(asset.values || {}).some((v) =>
+          String(v || '').toLowerCase().includes(q)
+        );
+        if (!titleMatch && !tagsMatch && !valuesMatch) return false;
+      }
+
+      // ۲. فیلتر برچسب‌ها
+      if (selectedTags.length > 0) {
+        const assetTags = (asset.tags || []).map((t) => t.toLowerCase());
+        if (tagFilterMode === 'AND') {
+          const hasAll = selectedTags.every((st) => assetTags.includes(st.toLowerCase()));
+          if (!hasAll) return false;
+        } else {
+          const hasAny = selectedTags.some((st) => assetTags.includes(st.toLowerCase()));
+          if (!hasAny) return false;
+        }
+      }
+
+      // ۳. فیلتر سررسید و انقضا
+      if (expiryStatusFilter !== 'all') {
+        const status = checkAssetExpiry(asset);
+        if (expiryStatusFilter === 'has_expiry' && !status.hasExpiry) return false;
+        if (expiryStatusFilter === 'expired' && !status.isExpired) return false;
+        if (expiryStatusFilter === 'urgent' && !status.isUrgent) return false;
+      }
+
+      return true;
+    });
+  }, [assets, filterSearch, selectedTags, tagFilterMode, expiryStatusFilter]);
+
+  const activeFiltersCount =
+    (filterSearch.trim() ? 1 : 0) +
+    selectedTags.length +
+    (expiryStatusFilter !== 'all' ? 1 : 0);
+
+  const handleToggleTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter((t) => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+
+  const handleSingleTagFilter = (tag: string) => {
+    if (selectedTags.length === 1 && selectedTags[0] === tag) {
+      setSelectedTags([]);
+      showToast(`فیلتر برچسب «${tag}» غیرفعال شد.`, 'info');
+    } else {
+      setSelectedTags([tag]);
+      showToast(`فیلتر بر اساس برچسب «${tag}» فعال شد.`, 'info');
+    }
+  };
+
+  const handleClearAllFilters = () => {
+    setFilterSearch('');
+    setSelectedTags([]);
+    setExpiryStatusFilter('all');
+    showToast('کلیه فیلترها پاکسازی شدند.', 'info');
+  };
+
   // سیستم تم هماهنگ با تنظیمات
   const theme = settings.theme;
   const toggleTheme = () => {
@@ -115,6 +254,7 @@ function AppContent() {
     const items = validRows.map((r) => ({
       title: r.title,
       inputValues: r.inputValues,
+      tags: r.tags || [],
     }));
 
     try {
@@ -132,6 +272,7 @@ function AppContent() {
         assetType: activeAssetType,
         title: item.title,
         values: item.inputValues,
+        tags: item.tags || [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }));
@@ -293,7 +434,7 @@ function AppContent() {
       }
     } catch {}
 
-    // تولید داده‌های نمونه برای پیش‌نمایش
+    // تولید داده‌های نمونه برای پیش‌نمایش با برچسب‌های پیش‌فرض
     let sampleAssets: Asset[] = [];
     if (typeId === 'vps') {
       sampleAssets = [
@@ -302,6 +443,7 @@ function AppContent() {
           assetTypeId: 'vps',
           assetType: activeAssetType!,
           title: 'سرور اصلی دیتاسنتر تهران',
+          tags: ['Production', 'اصلی', 'Critical'],
           values: {
             ip_address: '192.168.10.15:22',
             ssh_port: '22',
@@ -319,6 +461,7 @@ function AppContent() {
           assetTypeId: 'vps',
           assetType: activeAssetType!,
           title: 'لودبالانسر و پروکسی شبکه',
+          tags: ['Production', 'شبکه', 'پروکسی'],
           values: {
             ip_address: '10.0.1.5:443',
             ssh_port: '2222',
@@ -335,6 +478,7 @@ function AppContent() {
           assetTypeId: 'vps',
           assetType: activeAssetType!,
           title: 'سرور بکاپ آلمان (Hetzner)',
+          tags: ['Backup', 'Staging', 'آلمان'],
           values: {
             ip_address: '89.144.20.12',
             ssh_port: '22',
@@ -354,6 +498,7 @@ function AppContent() {
           assetTypeId: 'email',
           assetType: activeAssetType!,
           title: 'ایمیل رسمی مدیر عامل',
+          tags: ['مدیریت', 'Internal'],
           values: {
             email_address: 'ceo@company.ir',
             password: '••••••••',
@@ -368,6 +513,7 @@ function AppContent() {
           assetTypeId: 'email',
           assetType: activeAssetType!,
           title: 'ایمیل دپارتمان مالی',
+          tags: ['مالی', 'Internal'],
           values: {
             email_address: 'finance@company.ir',
             password: '••••••••',
@@ -385,6 +531,7 @@ function AppContent() {
           assetTypeId: 'domains',
           assetType: activeAssetType!,
           title: 'دامنه اصلی شرکت (company.ir)',
+          tags: ['Production', 'برند اصلی'],
           values: {
             domain_name: 'company.ir',
             registrar: 'ایران‌سرور / ایرنیک',
@@ -398,6 +545,7 @@ function AppContent() {
           assetTypeId: 'domains',
           assetType: activeAssetType!,
           title: 'دامنه بین‌المللی برند (company.com)',
+          tags: ['بین‌المللی', 'برند'],
           values: {
             domain_name: 'company.com',
             registrar: 'Namecheap',
@@ -414,6 +562,7 @@ function AppContent() {
           assetTypeId: 'licenses',
           assetType: activeAssetType!,
           title: 'لایسنس ابری JetBrains All Products',
+          tags: ['Cloud', 'توسعه'],
           values: {
             software_name: 'JetBrains Toolbox',
             license_key: '••••••••',
@@ -428,6 +577,7 @@ function AppContent() {
           assetTypeId: 'licenses',
           assetType: activeAssetType!,
           title: 'اشتراک سالانه GitKraken Pro',
+          tags: ['ابزار', 'توسعه'],
           values: {
             software_name: 'GitKraken Client',
             license_key: '••••••••',
@@ -950,204 +1100,379 @@ function AppContent() {
             </div>
 
             {categoryViewTab === 'grid' ? (
-              /* جدول داده اکسل‌گونه پویا */
-              <div className="flex-1 px-6 pb-6 overflow-auto pt-3">
-              <div className="border border-slate-200 dark:border-border-strong rounded-xl bg-white dark:bg-surface-1 overflow-hidden shadow-xs">
-                <table className="w-full text-right border-collapse">
-                  <thead>
-                    <tr className={`border-b border-slate-200 dark:border-border-strong bg-slate-50/90 dark:bg-surface-2/60 text-slate-700 dark:text-slate-300 font-semibold transition-all ${
-                      density === 'compact' ? 'text-[11px]' : 'text-xs'
-                    }`}>
-                      <th className={`${density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'} w-12 text-center`}>#</th>
-                      <th className={density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'}>عنوان دارایی</th>
+              /* جدول داده اکسل‌گونه پویا به همراه نوار فیلتر پیشرفته */
+              <div className="flex-1 px-6 pb-6 overflow-auto pt-3 flex flex-col min-h-0">
+                {/* نوار فیلترهای پیشرفته و برچسب‌ها */}
+                <div className="mb-3 bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-xl p-3 shadow-2xs space-y-2.5 shrink-0">
+                  {/* ردیف اول: جستجوی متنی زنده، فیلتر وضعیت سررسید، دکمه پاکسازی، و آمار */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-1 max-w-lg">
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={filterSearch}
+                          onChange={(e) => setFilterSearch(e.target.value)}
+                          placeholder="جستجو در عنوان دارایی، فیلدها و برچسب‌ها..."
+                          className="w-full bg-slate-50 dark:bg-surface-2 border border-slate-200 dark:border-border-strong rounded-lg pr-9 pl-8 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition"
+                        />
+                        {filterSearch && (
+                          <button
+                            onClick={() => setFilterSearch('')}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-surface-elevated text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+                            title="پاک کردن متن جستجو"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
 
-                      {/* رندر ستون‌های داینامیک انتخاب‌شده توسط کاربر */}
-                      {visibleFields.map((field) => (
-                        <th key={field.id} className={density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'}>
-                          {field.label}
-                        </th>
-                      ))}
+                      {/* فیلتر وضعیت سررسید */}
+                      <select
+                        value={expiryStatusFilter}
+                        onChange={(e) => setExpiryStatusFilter(e.target.value as any)}
+                        className="bg-slate-50 dark:bg-surface-2 border border-slate-200 dark:border-border-strong rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition cursor-pointer font-medium"
+                      >
+                        <option value="all">همه وضعیت‌ها</option>
+                        <option value="has_expiry">📅 دارای سررسید</option>
+                        <option value="urgent">⚠️ تمدید فوری (&lt; ۳۰ روز)</option>
+                        <option value="expired">🚨 منقضی‌شده</option>
+                      </select>
+                    </div>
 
-                      <th className={`${density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'} w-16 text-center`}>جزئیات</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y divide-slate-200/80 dark:divide-border-subtle ${
-                    density === 'compact' ? 'text-[11px]' : 'text-xs'
-                  }`}>
-                    {isAssetsLoading ? (
-                      <tr>
-                        <td
-                          colSpan={visibleFields.length + 3}
-                          className="p-8 text-center text-slate-500 dark:text-slate-400"
+                    {/* بخش آمار نتایج و دکمه پاکسازی فیلترها */}
+                    <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center text-xs">
+                      <span className="text-slate-500 dark:text-slate-400 font-medium">
+                        نمایش <strong className="text-slate-900 dark:text-white font-mono font-bold">{filteredAssets.length}</strong> از <span className="font-mono">{assets.length}</span> رکورد
+                      </span>
+
+                      {activeFiltersCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleClearAllFilters}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 text-[11px] font-semibold transition shadow-2xs"
                         >
-                          در حال بارگذاری اطلاعات دارایی‌ها...
-                        </td>
-                      </tr>
-                    ) : assets.length > 0 ? (
-                      assets.map((asset, index) => {
-                        const cellPadding = density === 'compact' ? 'py-1 px-3' : 'py-3.5 px-4';
-                        return (
-                          <tr
-                            key={asset.id}
-                            onClick={() => {
-                              setSelectedAsset(asset);
-                              setIsDrawerOpen(true);
-                            }}
-                            className={`hover:bg-slate-50/90 dark:hover:bg-surface-2/60 transition-all cursor-pointer ${
-                              density === 'compact' ? 'h-9' : 'h-14'
+                          <RotateCcw className="w-3 h-3" />
+                          <span>پاکسازی فیلترها ({activeFiltersCount})</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ردیف دوم: چیپ‌های برچسب موجود در دسته جاری با شمارنده و سوئیچ AND/OR */}
+                  {availableTagsWithCount.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-border-subtle flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 ml-1">
+                          <Tag className="w-3 h-3 text-indigo-500" />
+                          <span>برچسب‌ها:</span>
+                        </span>
+
+                        {/* دکمه همه برچسب‌ها */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTags([])}
+                          className={`text-[11px] px-2.5 py-0.5 rounded-md font-medium border transition ${
+                            selectedTags.length === 0
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs font-semibold'
+                              : 'bg-slate-50 dark:bg-surface-2 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-border-strong hover:bg-slate-100 dark:hover:bg-surface-elevated'
+                          }`}
+                        >
+                          همه ({assets.length})
+                        </button>
+
+                        {/* چیپ‌های تک‌تک برچسب‌ها */}
+                        {availableTagsWithCount.map(({ tag, count }) => {
+                          const isSelected = selectedTags.includes(tag);
+                          return (
+                            <TagBadge
+                              key={tag}
+                              tag={tag}
+                              count={count}
+                              isSelected={isSelected}
+                              onClick={() => handleToggleTag(tag)}
+                              className="cursor-pointer"
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* سوئیچ منطق AND / OR هنگام انتخاب چند برچسب */}
+                      {selectedTags.length > 1 && (
+                        <div className="flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-surface-2 p-0.5 rounded-lg border border-slate-200 dark:border-border-strong animate-in fade-in">
+                          <span className="text-slate-500 px-1.5 font-medium">منطق فیلتر:</span>
+                          <button
+                            type="button"
+                            onClick={() => setTagFilterMode('OR')}
+                            className={`px-2 py-0.5 rounded font-semibold transition ${
+                              tagFilterMode === 'OR'
+                                ? 'bg-white dark:bg-surface-elevated text-indigo-700 dark:text-indigo-300 shadow-2xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                             }`}
                           >
-                            <td className={`${cellPadding} text-center text-slate-400 dark:text-slate-500 font-mono`}>{index + 1}</td>
-                            <td className={`${cellPadding} font-semibold text-slate-900 dark:text-slate-100`}>
-                              {asset.title}
-                            </td>
+                            یا (OR)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTagFilterMode('AND')}
+                            className={`px-2 py-0.5 rounded font-semibold transition ${
+                              tagFilterMode === 'AND'
+                                ? 'bg-white dark:bg-surface-elevated text-indigo-700 dark:text-indigo-300 shadow-2xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                            }`}
+                          >
+                            و (AND)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                            {/* سلول‌های مقادیر بر اساس ستون‌های انتخابی */}
-                            {visibleFields.map((field) => {
-                              const val = asset.values?.[field.name];
-                              const cellId = `${asset.id}-${field.name}`;
-                              const isCopyable = Boolean(field.isCopyable);
+                {/* جدول داده اکسل‌گونه */}
+                <div className="border border-slate-200 dark:border-border-strong rounded-xl bg-white dark:bg-surface-1 overflow-hidden shadow-xs flex-1">
+                  <table className="w-full text-right border-collapse">
+                    <thead>
+                      <tr className={`border-b border-slate-200 dark:border-border-strong bg-slate-50/90 dark:bg-surface-2/60 text-slate-700 dark:text-slate-300 font-semibold transition-all ${
+                        density === 'compact' ? 'text-[11px]' : 'text-xs'
+                      }`}>
+                        <th className={`${density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'} w-12 text-center`}>#</th>
+                        <th className={density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'}>عنوان دارایی</th>
 
-                              if (field.type === 'secret') {
-                                return (
-                                  <td key={field.id} className={cellPadding}>
-                                    <SecretCell assetId={asset.id} fieldKey={field.name} />
-                                  </td>
-                                );
-                              }
+                        {/* رندر ستون‌های داینامیک انتخاب‌شده توسط کاربر */}
+                        {visibleFields.map((field) => (
+                          <th key={field.id} className={density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'}>
+                            {field.label}
+                          </th>
+                        ))}
 
-                              if (field.type === 'ip_port') {
-                                return (
-                                  <td key={field.id} className={cellPadding}>
-                                    {val ? (
-                                      <div className="inline-flex items-center gap-1.5">
-                                        {isCopyable && (
-                                          <button
-                                            onClick={(e) => handleCopy(String(val), cellId, e)}
-                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
-                                            title={`کپی ${field.label}`}
-                                          >
-                                            {copiedCellId === cellId ? (
-                                              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                            ) : (
-                                              <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
-                                            )}
-                                          </button>
-                                        )}
-                                        <span dir="ltr" className={`font-mono font-medium rounded bg-slate-100 text-slate-800 border border-slate-200/90 dark:bg-surface-2 dark:text-indigo-300 dark:border-border-strong ${
-                                          density === 'compact' ? 'text-[11px] px-1.5 py-0.5' : 'text-xs px-2.5 py-1'
-                                        }`}>
-                                          {val}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-400 dark:text-slate-600">—</span>
-                                    )}
-                                  </td>
-                                );
-                              }
-
-                              if (field.type === 'jalali_date') {
-                                return (
-                                  <td key={field.id} className={cellPadding}>
-                                    {val ? (
-                                      <div className="inline-flex items-center gap-1.5">
-                                        {isCopyable && (
-                                          <button
-                                            onClick={(e) => handleCopy(String(val), cellId, e)}
-                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
-                                            title={`کپی ${field.label}`}
-                                          >
-                                            {copiedCellId === cellId ? (
-                                              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                            ) : (
-                                              <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
-                                            )}
-                                          </button>
-                                        )}
-                                        <span className={`inline-flex items-center rounded-md font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 ${
-                                          density === 'compact' ? 'text-[10px] px-1.5 py-0.5' : 'text-[11px] px-2.5 py-1'
-                                        }`}>
-                                          {val}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-400 dark:text-slate-600">—</span>
-                                    )}
-                                  </td>
-                                );
-                              }
-
-                              return (
-                                <td key={field.id} className={`${cellPadding} text-slate-700 dark:text-slate-300`}>
-                                  {val ? (
-                                    <div className="inline-flex items-center gap-1.5 max-w-full">
-                                      {isCopyable && (
-                                        <button
-                                          onClick={(e) => handleCopy(String(val), cellId, e)}
-                                          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
-                                          title={`کپی ${field.label}`}
-                                        >
-                                          {copiedCellId === cellId ? (
-                                            <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                          ) : (
-                                            <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
-                                          )}
-                                        </button>
-                                      )}
-                                      <span className="truncate">{val}</span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-slate-400 dark:text-slate-600">—</span>
-                                  )}
-                                </td>
-                              );
-                            })}
-
-                            <td className={`${cellPadding} text-center`}>
-                              <ExternalLink className="w-3.5 h-3.5 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 inline" />
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={visibleFields.length + 3}
-                          className="p-12 text-center text-slate-500 dark:text-slate-400"
-                        >
-                          <div className="max-w-xs mx-auto space-y-3">
-                            <div className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                              هنوز هیچ دارایی در دسته «{activeAssetType.name}» ثبت نشده است.
-                            </div>
-                            {(user?.role === 'ADMIN' || user?.role === 'EDITOR') && (
-                              <div className="flex items-center justify-center gap-2 pt-1">
-                                <button
-                                  onClick={() => {
-                                    setSelectedAsset(null);
-                                    setIsDrawerOpen(true);
-                                  }}
-                                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs shadow-indigo-600/20 transition"
-                                >
-                                  ثبت اولین {activeAssetType.name}
-                                </button>
-                                <button
-                                  onClick={() => setIsImportModalOpen(true)}
-                                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-border-strong bg-white dark:bg-surface-2 hover:bg-slate-50 dark:hover:bg-surface-elevated text-xs font-semibold text-slate-700 dark:text-slate-200 transition shadow-2xs"
-                                >
-                                  <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                  <span>بارگذاری از اکسل</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
+                        <th className={`${density === 'compact' ? 'py-2 px-3' : 'py-3.5 px-4'} w-16 text-center`}>جزئیات</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className={`divide-y divide-slate-200/80 dark:divide-border-subtle ${
+                      density === 'compact' ? 'text-[11px]' : 'text-xs'
+                    }`}>
+                      {isAssetsLoading ? (
+                        <tr>
+                          <td
+                            colSpan={visibleFields.length + 3}
+                            className="p-8 text-center text-slate-500 dark:text-slate-400"
+                          >
+                            در حال بارگذاری اطلاعات دارایی‌ها...
+                          </td>
+                        </tr>
+                      ) : filteredAssets.length > 0 ? (
+                        filteredAssets.map((asset, index) => {
+                          const cellPadding = density === 'compact' ? 'py-1.5 px-3' : 'py-3.5 px-4';
+                          return (
+                            <tr
+                              key={asset.id}
+                              onClick={() => {
+                                setSelectedAsset(asset);
+                                setIsDrawerOpen(true);
+                              }}
+                              className={`hover:bg-slate-50/90 dark:hover:bg-surface-2/60 transition-all cursor-pointer ${
+                                density === 'compact' ? 'min-h-[40px]' : 'h-14'
+                              }`}
+                            >
+                              <td className={`${cellPadding} text-center text-slate-400 dark:text-slate-500 font-mono`}>{index + 1}</td>
+                              
+                              {/* ستون عنوان اصلی و برچسب‌های رنگی سطر */}
+                              <td className={`${cellPadding} font-semibold text-slate-900 dark:text-slate-100`}>
+                                <div className="flex flex-col gap-1">
+                                  <span>{asset.title}</span>
+                                  {asset.tags && asset.tags.length > 0 && (
+                                    <div className="flex items-center flex-wrap gap-1">
+                                      {asset.tags.map((t) => (
+                                        <TagBadge
+                                          key={t}
+                                          tag={t}
+                                          size="xs"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSingleTagFilter(t);
+                                          }}
+                                          isSelected={selectedTags.includes(t)}
+                                          title={`کلیک برای فیلتر بر اساس «${t}»`}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* سلول‌های مقادیر بر اساس ستون‌های انتخابی */}
+                              {visibleFields.map((field) => {
+                                const val = asset.values?.[field.name];
+                                const cellId = `${asset.id}-${field.name}`;
+                                const isCopyable = Boolean(field.isCopyable);
+
+                                if (field.type === 'secret') {
+                                  return (
+                                    <td key={field.id} className={cellPadding}>
+                                      <SecretCell assetId={asset.id} fieldKey={field.name} />
+                                    </td>
+                                  );
+                                }
+
+                                if (field.type === 'ip_port') {
+                                  return (
+                                    <td key={field.id} className={cellPadding}>
+                                      {val ? (
+                                        <div className="inline-flex items-center gap-1.5">
+                                          {isCopyable && (
+                                            <button
+                                              onClick={(e) => handleCopy(String(val), cellId, e)}
+                                              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
+                                              title={`کپی ${field.label}`}
+                                            >
+                                              {copiedCellId === cellId ? (
+                                                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                              ) : (
+                                                <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+                                              )}
+                                            </button>
+                                          )}
+                                          <span dir="ltr" className={`font-mono font-medium rounded bg-slate-100 text-slate-800 border border-slate-200/90 dark:bg-surface-2 dark:text-indigo-300 dark:border-border-strong ${
+                                            density === 'compact' ? 'text-[11px] px-1.5 py-0.5' : 'text-xs px-2.5 py-1'
+                                          }`}>
+                                            {val}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400 dark:text-slate-600">—</span>
+                                      )}
+                                    </td>
+                                  );
+                                }
+
+                                if (field.type === 'jalali_date') {
+                                  return (
+                                    <td key={field.id} className={cellPadding}>
+                                      {val ? (
+                                        <div className="inline-flex items-center gap-1.5">
+                                          {isCopyable && (
+                                            <button
+                                              onClick={(e) => handleCopy(String(val), cellId, e)}
+                                              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
+                                              title={`کپی ${field.label}`}
+                                            >
+                                              {copiedCellId === cellId ? (
+                                                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                              ) : (
+                                                <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+                                              )}
+                                            </button>
+                                          )}
+                                          <span className={`inline-flex items-center rounded-md font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 ${
+                                            density === 'compact' ? 'text-[10px] px-1.5 py-0.5' : 'text-[11px] px-2.5 py-1'
+                                          }`}>
+                                            {val}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400 dark:text-slate-600">—</span>
+                                      )}
+                                    </td>
+                                  );
+                                }
+
+                                return (
+                                  <td key={field.id} className={`${cellPadding} text-slate-700 dark:text-slate-300`}>
+                                    {val ? (
+                                      <div className="inline-flex items-center gap-1.5 max-w-full">
+                                        {isCopyable && (
+                                          <button
+                                            onClick={(e) => handleCopy(String(val), cellId, e)}
+                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
+                                            title={`کپی ${field.label}`}
+                                          >
+                                            {copiedCellId === cellId ? (
+                                              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                            ) : (
+                                              <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+                                            )}
+                                          </button>
+                                        )}
+                                        <span className="truncate">{val}</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-400 dark:text-slate-600">—</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+
+                              <td className={`${cellPadding} text-center`}>
+                                <ExternalLink className="w-3.5 h-3.5 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 inline" />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : assets.length > 0 ? (
+                        /* وضعیت زمانی که دارایی وجود دارد اما با فیلترها تطابق ندارد */
+                        <tr>
+                          <td
+                            colSpan={visibleFields.length + 3}
+                            className="p-12 text-center text-slate-500 dark:text-slate-400"
+                          >
+                            <div className="max-w-xs mx-auto space-y-2">
+                              <Filter className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-1" />
+                              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                دارایی‌ای مطابق با فیلترهای انتخابی یافت نشد
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                لطفاً عبارت جستجو را تغییر دهید یا فیلترهای برچسب را پاکسازی کنید.
+                              </p>
+                              <button
+                                onClick={handleClearAllFilters}
+                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 text-xs font-semibold border border-indigo-200 dark:border-indigo-500/30 transition shadow-2xs"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>پاکسازی فیلترها</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        /* وضعیت عدم وجود هرگونه دارایی در دسته */
+                        <tr>
+                          <td
+                            colSpan={visibleFields.length + 3}
+                            className="p-12 text-center text-slate-500 dark:text-slate-400"
+                          >
+                            <div className="max-w-xs mx-auto space-y-3">
+                              <div className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                                هنوز هیچ دارایی در دسته «{activeAssetType.name}» ثبت نشده است.
+                              </div>
+                              {(user?.role === 'ADMIN' || user?.role === 'EDITOR') && (
+                                <div className="flex items-center justify-center gap-2 pt-1">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedAsset(null);
+                                      setIsDrawerOpen(true);
+                                    }}
+                                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs shadow-indigo-600/20 transition"
+                                  >
+                                    ثبت اولین {activeAssetType.name}
+                                  </button>
+                                  <button
+                                    onClick={() => setIsImportModalOpen(true)}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-border-strong bg-white dark:bg-surface-2 hover:bg-slate-50 dark:hover:bg-surface-elevated text-xs font-semibold text-slate-700 dark:text-slate-200 transition shadow-2xs"
+                                  >
+                                    <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                    <span>بارگذاری از اکسل</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
             ) : (
               /* تب ویکی و مستندات مارکداون در سطح دسته */
               <CategoryWikiView
@@ -1168,10 +1493,13 @@ function AppContent() {
           onSaved={(savedAsset) => {
             setAssets((prev) => {
               const exists = prev.some((a) => a.id === savedAsset.id);
-              if (exists) {
-                return prev.map((a) => (a.id === savedAsset.id ? savedAsset : a));
-              }
-              return [savedAsset, ...prev];
+              const updatedList = exists
+                ? prev.map((a) => (a.id === savedAsset.id ? savedAsset : a))
+                : [savedAsset, ...prev];
+              try {
+                localStorage.setItem('daftar_demo_assets', JSON.stringify(updatedList));
+              } catch {}
+              return updatedList;
             });
             setAssetTypes((prev) =>
               prev.map((t) =>

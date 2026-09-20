@@ -10,6 +10,8 @@ import {
   createAsset, 
   createAssetsBatch,
   updateAsset, 
+  rollbackAsset,
+  getAssetTimeline,
   revealSecret, 
   formatAssetForClient, 
   getSecretKeysFromSchema 
@@ -102,6 +104,7 @@ export async function assetsRoutes(app: FastifyInstance) {
       assetTypeId: z.string().min(1, 'شناسه دسته دارایی الزامی است'),
       title: z.string().min(1, 'عنوان دارایی الزامی است'),
       values: z.record(z.any()).default({}),
+      tags: z.array(z.string()).optional(),
       expiryDate: z.string().optional().nullable(),
       docsMarkdown: z.string().optional().nullable(),
     });
@@ -121,6 +124,7 @@ export async function assetsRoutes(app: FastifyInstance) {
         assetTypeId: parsed.data.assetTypeId,
         title: parsed.data.title,
         inputValues: parsed.data.values,
+        tags: parsed.data.tags,
         expiryDate: parsed.data.expiryDate ? new Date(parsed.data.expiryDate) : null,
         docsMarkdown: parsed.data.docsMarkdown,
         ipAddress: request.ip,
@@ -141,6 +145,7 @@ export async function assetsRoutes(app: FastifyInstance) {
         z.object({
           title: z.string().min(1, 'عنوان دارایی الزامی است'),
           inputValues: z.record(z.any()).default({}),
+          tags: z.array(z.string()).optional(),
           expiryDate: z.string().optional().nullable(),
           docsMarkdown: z.string().optional().nullable(),
         })
@@ -160,6 +165,7 @@ export async function assetsRoutes(app: FastifyInstance) {
       const itemsToCreate = parsed.data.items.map((item) => ({
         title: item.title,
         inputValues: item.inputValues,
+        tags: item.tags,
         expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
         docsMarkdown: item.docsMarkdown,
       }));
@@ -257,6 +263,7 @@ export async function assetsRoutes(app: FastifyInstance) {
         userId: request.user!.id,
         title: body.title,
         inputValues: body.values,
+        tags: Array.isArray(body.tags) ? body.tags : undefined,
         expiryDate: body.expiryDate ? new Date(body.expiryDate) : body.expiryDate === null ? null : undefined,
         docsMarkdown: body.docsMarkdown,
         ipAddress: request.ip,
@@ -326,4 +333,70 @@ export async function assetsRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: err.message });
     }
   });
+
+  // دریافت تاریخچه تغییرات و تایم‌لاین دارایی
+  app.get('/:id/timeline', { preHandler: [requireAuth] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const asset = await prisma.asset.findUnique({
+      where: { id },
+      select: { assetTypeId: true },
+    });
+
+    if (!asset) {
+      return reply.status(404).send({ message: 'دارایی مورد نظر یافت نشد.' });
+    }
+
+    if (!canAccessCategory(request.user!, asset.assetTypeId)) {
+      return reply.status(403).send({ message: 'عدم دسترسی به تاریخچه این دارایی.' });
+    }
+
+    try {
+      const logs = await getAssetTimeline(id);
+      return logs;
+    } catch (err: any) {
+      return reply.status(400).send({ message: err.message });
+    }
+  });
+
+  // بازگردانی دارایی به نسخه پیشین (Rollback)
+  app.post('/:id/rollback', { preHandler: [requireEditor] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const schema = z.object({
+      logId: z.string().min(1, 'شناسه رکورد تاریخچه الزامی است'),
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: parsed.error.errors[0].message });
+    }
+
+    const asset = await prisma.asset.findUnique({
+      where: { id },
+      select: { assetTypeId: true },
+    });
+
+    if (!asset) {
+      return reply.status(404).send({ message: 'دارایی مورد نظر یافت نشد.' });
+    }
+
+    if (!canAccessCategory(request.user!, asset.assetTypeId)) {
+      return reply.status(403).send({ message: 'شما اجازه ویرایش دارایی در این دسته را ندارید.' });
+    }
+
+    try {
+      const updatedAsset = await rollbackAsset({
+        assetId: id,
+        logId: parsed.data.logId,
+        userId: request.user!.id,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return updatedAsset;
+    } catch (err: any) {
+      return reply.status(400).send({ message: err.message });
+    }
+  });
 }
+
