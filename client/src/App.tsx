@@ -27,6 +27,7 @@ import {
   Filter,
   Tag,
   RotateCcw,
+  Network,
   X
 } from 'lucide-react';
 
@@ -444,6 +445,20 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'سرور اصلی دیتاسنتر تهران',
           tags: ['Production', 'اصلی', 'Critical'],
+          relations: [
+            {
+              id: 'rel-1',
+              targetAssetId: 'vps-2',
+              type: 'DEPENDS_ON',
+              note: 'لودبالانسر ورودی ترافیک',
+            },
+            {
+              id: 'rel-2',
+              targetAssetId: 'vps-3',
+              type: 'BACKUP_OF',
+              note: 'بکاپ روزانه در دیتاسنتر آلمان',
+            },
+          ],
           values: {
             ip_address: '192.168.10.15:22',
             ssh_port: '22',
@@ -479,6 +494,14 @@ function AppContent() {
           assetType: activeAssetType!,
           title: 'سرور بکاپ آلمان (Hetzner)',
           tags: ['Backup', 'Staging', 'آلمان'],
+          relations: [
+            {
+              id: 'rel-3',
+              targetAssetId: 'vps-1',
+              type: 'BACKUP_OF',
+              note: 'پشتیبان‌گیری از دیتابیس و فایل‌های سرور تهران',
+            },
+          ],
           values: {
             ip_address: '89.144.20.12',
             ssh_port: '22',
@@ -1279,8 +1302,24 @@ function AppContent() {
                               
                               {/* ستون عنوان اصلی و برچسب‌های رنگی سطر */}
                               <td className={`${cellPadding} font-semibold text-slate-900 dark:text-slate-100`}>
-                                <div className="flex flex-col gap-1">
-                                  <span>{asset.title}</span>
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span>{asset.title}</span>
+                                      {(() => {
+                                        const rels = (asset.values as any)?.__relations || asset.relations;
+                                        const count = Array.isArray(rels) ? rels.length : 0;
+                                        if (count === 0) return null;
+                                        return (
+                                          <span
+                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                                            title={`${count} ارتباط و وابستگی ثبت‌شده`}
+                                          >
+                                            <Network className="w-2.5 h-2.5" />
+                                            <span>{count}</span>
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
                                   {asset.tags && asset.tags.length > 0 && (
                                     <div className="flex items-center flex-wrap gap-1">
                                       {asset.tags.map((t) => (
@@ -1490,6 +1529,25 @@ function AppContent() {
           asset={selectedAsset}
           assetType={activeAssetType}
           onClose={() => setIsDrawerOpen(false)}
+          onSelectAsset={(targetId) => {
+            const found = assets.find((a) => a.id === targetId);
+            if (found) {
+              setSelectedAsset(found);
+            } else {
+              try {
+                const demoAssetsStr = localStorage.getItem('daftar_demo_assets');
+                if (demoAssetsStr) {
+                  const list: Asset[] = JSON.parse(demoAssetsStr);
+                  const inDemo = list.find((a) => a.id === targetId);
+                  if (inDemo) {
+                    setSelectedAsset(inDemo);
+                    const t = assetTypes.find((x) => x.id === inDemo.assetTypeId);
+                    if (t) setActiveTypeId(t.id);
+                  }
+                }
+              } catch {}
+            }
+          }}
           onSaved={(savedAsset) => {
             setAssets((prev) => {
               const exists = prev.some((a) => a.id === savedAsset.id);

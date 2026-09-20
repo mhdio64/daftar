@@ -305,8 +305,15 @@ export function formatAssetForClient(asset: any, secretKeys: string[]) {
     ? asset.tags
     : [];
 
-  // حذف فیلد داخلی __tags از values برای حفظ خلوص فیلدهای داینامیک اسکیما
+  const relations = Array.isArray(normalValues.__relations)
+    ? normalValues.__relations
+    : Array.isArray(asset.relations)
+    ? asset.relations
+    : [];
+
+  // حذف فیلدهای داخلی از values برای حفظ خلوص فیلدهای داینامیک اسکیما
   delete maskedValues.__tags;
+  delete maskedValues.__relations;
 
   // اضافه کردن مقادیر ماسک شده برای فیلدهای محرمانه
   for (const key of secretKeys) {
@@ -321,6 +328,7 @@ export function formatAssetForClient(asset: any, secretKeys: string[]) {
   return {
     ...asset,
     tags,
+    relations,
     values: maskedValues,
     encryptedValues: undefined, // هرگز هش‌ها و تگ‌های رمزنگاری شده به کلاینت فرستاده نمی‌شوند
   };
@@ -456,4 +464,224 @@ export async function rollbackAsset(params: {
 
   return formatAssetForClient(updated, secretKeys);
 }
+
+export interface AssetRelationItem {
+  id: string;
+  targetAssetId: string;
+  type: 'HOSTED_ON' | 'DEPENDS_ON' | 'POINTS_TO' | 'BACKUP_OF' | 'RELATED_TO';
+  note?: string;
+}
+
+/**
+ * دریافت ارتباطات ورودی و خروجی یک دارایی (Dependencies & Inbound Relations)
+ */
+export async function getAssetRelations(assetId: string) {
+  const currentAsset = await prisma.asset.findUnique({
+    where: { id: assetId },
+    include: { assetType: true },
+  });
+
+  if (!currentAsset) {
+    throw new Error('دارایی مورد نظر یافت نشد.');
+  }
+
+  const values = (currentAsset.values as Record<string, any>) || {};
+  const outboundRaw: AssetRelationItem[] = Array.isArray(values.__relations) ? values.__relations : [];
+
+  // واکشی مشخصات تمام دارایی‌ها برای اتصال نام و دسته
+  const allAssets = await prisma.asset.findMany({
+    select: {
+      id: true,
+      title: true,
+      assetTypeId: true,
+      values: true,
+      assetType: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+        },
+      },
+    },
+  });
+
+  const assetMap = new Map<string, any>();
+  for (const a of allAssets) {
+    assetMap.set(a.id, {
+      id: a.id,
+      title: a.title,
+      assetTypeId: a.assetTypeId,
+      assetTypeName: a.assetType?.name || 'سایر',
+      assetTypeIcon: a.assetType?.icon || 'Box',
+      assetTypeSlug: a.assetType?.slug || 'other',
+    });
+  }
+
+  // ۱. ارتباطات خروجی (این دارایی وابسته به دارایی‌های دیگر است)
+  const outbound = outboundRaw.map((rel) => ({
+    ...rel,
+    targetAsset: assetMap.get(rel.targetAssetId) || {
+      id: rel.targetAssetId,
+      title: 'دارایی حذف‌شده یا نامشخص',
+      assetTypeName: 'نامشخص',
+      assetTypeIcon: 'AlertTriangle',
+      assetTypeSlug: 'unknown',
+    },
+  }));
+
+  // ۲. ارتباطات ورودی (سایر دارایی‌ها که به این دارایی متصل شده‌اند)
+  const inbound: any[] = [];
+  for (const a of allAssets) {
+    if (a.id === assetId) continue;
+    const aVals = (a.values as Record<string, any>) || {};
+    const aRels: AssetRelationItem[] = Array.isArray(aVals.__relations) ? aVals.__relations : [];
+    for (const r of aRels) {
+      if (r.targetAssetId === assetId) {
+        inbound.push({
+          id: r.id,
+          sourceAssetId: a.id,
+          targetAssetId: assetId,
+          type: r.type,
+          note: r.note,
+          sourceAsset: {
+            id: a.id,
+            title: a.title,
+            assetTypeId: a.assetTypeId,
+            assetTypeName: a.assetType?.name || 'سایر',
+            assetTypeIcon: a.assetType?.icon || 'Box',
+            assetTypeSlug: a.assetType?.slug || 'other',
+          },
+        });
+      }
+    }
+  }
+
+  return { outbound, inbound };
+}
+
+/**
+ * افزودن یک رابطه جدید بین دو دارایی
+ */
+export async function addAssetRelation(params: {
+  sourceAssetId: string;
+  targetAssetId: string;
+  type: 'HOSTED_ON' | 'DEPENDS_ON' | 'POINTS_TO' | 'BACKUP_OF' | 'RELATED_TO';
+  note?: string;
+  userId: string;
+  ipAddress?: string;
+  userAgent?: string;
+}) {
+  if (params.sourceAssetId === params.targetAssetId) {
+    throw new Error('یک دارایی نمی‌تواند به خودش متصل شود.');
+  }
+
+  const [source, target] = await Promise.all([
+    prisma.asset.findUnique({ where: { id: params.sourceAssetId }, include: { assetType: true } }),
+    prisma.asset.findUnique({ where: { id: params.targetAssetId }, select: { id: true, title: true } }),
+  ]);
+
+  if (!source) throw new Error('دارایی مبدا یافت نشد.');
+  if (!target) throw new Error('دارایی مقصد یافت نشد.');
+
+  const normalValues = (source.values as Record<string, any>) || {};
+  const relations: AssetRelationItem[] = Array.isArray(normalValues.__relations) ? [...normalValues.__relations] : [];
+
+  // بررسی عدم ثبت رابطه تکراری
+  const existingIdx = relations.findIndex(
+    (r) => r.targetAssetId === params.targetAssetId && r.type === params.type
+  );
+  if (existingIdx >= 0) {
+    throw new Error('این ارتباط قبلاً بین این دو دارایی ثبت شده است.');
+  }
+
+  const newRelation: AssetRelationItem = {
+    id: `rel-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    targetAssetId: params.targetAssetId,
+    type: params.type,
+    note: params.note?.trim() || undefined,
+  };
+
+  relations.push(newRelation);
+  normalValues.__relations = relations;
+
+  await prisma.asset.update({
+    where: { id: params.sourceAssetId },
+    data: {
+      values: normalValues,
+      updatedById: params.userId,
+    },
+  });
+
+  // ثبت لاگ ممیزی
+  await logAudit({
+    userId: params.userId,
+    action: 'UPDATE',
+    targetEntity: 'Asset',
+    targetId: source.id,
+    diff: {
+      __relationAdded: {
+        new: `اتصال نوع ${params.type} به دارایی «${target.title}»`,
+      },
+    },
+    ipAddress: params.ipAddress,
+    userAgent: params.userAgent,
+  });
+
+  return newRelation;
+}
+
+/**
+ * حذف یک رابطه از دارایی
+ */
+export async function deleteAssetRelation(params: {
+  sourceAssetId: string;
+  relationId: string;
+  userId: string;
+  ipAddress?: string;
+  userAgent?: string;
+}) {
+  const source = await prisma.asset.findUnique({
+    where: { id: params.sourceAssetId },
+  });
+
+  if (!source) throw new Error('دارایی مبدا یافت نشد.');
+
+  const normalValues = (source.values as Record<string, any>) || {};
+  const relations: AssetRelationItem[] = Array.isArray(normalValues.__relations) ? [...normalValues.__relations] : [];
+
+  const removedIndex = relations.findIndex((r) => r.id === params.relationId);
+  if (removedIndex === -1) {
+    throw new Error('ارتباط مورد نظر یافت نشد.');
+  }
+
+  const removed = relations.splice(removedIndex, 1)[0];
+  normalValues.__relations = relations;
+
+  await prisma.asset.update({
+    where: { id: params.sourceAssetId },
+    data: {
+      values: normalValues,
+      updatedById: params.userId,
+    },
+  });
+
+  // ثبت لاگ ممیزی
+  await logAudit({
+    userId: params.userId,
+    action: 'UPDATE',
+    targetEntity: 'Asset',
+    targetId: source.id,
+    diff: {
+      __relationRemoved: {
+        old: `حذف ارتباط نوع ${removed.type} به شناسه ${removed.targetAssetId}`,
+      },
+    },
+    ipAddress: params.ipAddress,
+    userAgent: params.userAgent,
+  });
+
+  return { success: true };
+}
+
 

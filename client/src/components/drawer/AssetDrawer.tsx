@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, FileText, Settings, Paperclip, Copy, Check, Edit3, Eye, EyeOff, Tag, History } from 'lucide-react';
+import { X, Save, Trash2, FileText, Settings, Paperclip, Copy, Check, Edit3, Eye, EyeOff, Tag, History, Network } from 'lucide-react';
 import { Asset, assetsService } from '../../services/assets.service.ts';
 import { AssetType } from '../../services/asset-types.service.ts';
 import { DynamicForm } from '../forms/DynamicForm.tsx';
@@ -8,6 +8,7 @@ import { QuickConnectBox } from '../common/QuickConnectBox.tsx';
 import { TagBadge } from '../common/TagBadge.tsx';
 import { TagInput } from '../common/TagInput.tsx';
 import { AssetTimelineView } from './AssetTimelineView.tsx';
+import { AssetRelationsView } from './AssetRelationsView.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
 
 interface AssetDrawerProps {
@@ -16,13 +17,14 @@ interface AssetDrawerProps {
   onClose: () => void;
   onSaved: (saved: Asset) => void;
   onDeleted: (id: string) => void;
+  onSelectAsset?: (assetId: string) => void;
 }
 
-export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: AssetDrawerProps) {
+export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onSelectAsset }: AssetDrawerProps) {
   const { showToast } = useToast();
   const isNew = !asset;
 
-  const [activeTab, setActiveTab] = useState<'props' | 'docs' | 'files' | 'history'>('props');
+  const [activeTab, setActiveTab] = useState<'props' | 'relations' | 'docs' | 'files' | 'history'>('props');
   const [title, setTitle] = useState(asset?.title || '');
   const [formValues, setFormValues] = useState<Record<string, any>>(() => asset?.values || {});
   const [tags, setTags] = useState<string[]>(() => asset?.tags || []);
@@ -301,6 +303,21 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
               <span>مشخصات و فیلدها</span>
             </button>
 
+            {!isNew && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('relations')}
+                className={`pb-3 font-semibold transition border-b-2 flex items-center gap-1.5 ${
+                  activeTab === 'relations'
+                    ? 'text-indigo-600 border-indigo-600 dark:text-indigo-400 dark:border-indigo-500'
+                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white border-transparent'
+                }`}
+              >
+                <Network className="w-3.5 h-3.5" />
+                <span>ارتباطات و وابستگی‌ها</span>
+              </button>
+            )}
+
             <button
               onClick={() => setActiveTab('docs')}
               className={`pb-3 font-semibold transition border-b-2 flex items-center gap-1.5 ${
@@ -556,6 +573,29 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted }: A
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'relations' && asset && (
+            <div className="py-1">
+              <AssetRelationsView
+                asset={{
+                  ...asset,
+                  title,
+                  values: formValues,
+                  tags,
+                }}
+                assetType={assetType}
+                onNavigateToAsset={onSelectAsset}
+                onRelationsUpdated={() => {
+                  onSaved({
+                    ...asset,
+                    title,
+                    values: formValues,
+                    tags,
+                  });
+                }}
+              />
             </div>
           )}
 

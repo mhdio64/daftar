@@ -12,6 +12,9 @@ import {
   updateAsset, 
   rollbackAsset,
   getAssetTimeline,
+  getAssetRelations,
+  addAssetRelation,
+  deleteAssetRelation,
   revealSecret, 
   formatAssetForClient, 
   getSecretKeysFromSchema 
@@ -398,5 +401,107 @@ export async function assetsRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: err.message });
     }
   });
+
+  // دریافت ارتباطات و وابستگی‌های یک دارایی
+  app.get('/:id/relations', { preHandler: [requireAuth] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const asset = await prisma.asset.findUnique({
+      where: { id },
+      select: { assetTypeId: true },
+    });
+
+    if (!asset) {
+      return reply.status(404).send({ message: 'دارایی مورد نظر یافت نشد.' });
+    }
+
+    if (!canAccessCategory(request.user!, asset.assetTypeId)) {
+      return reply.status(403).send({ message: 'عدم دسترسی به این دارایی.' });
+    }
+
+    try {
+      const data = await getAssetRelations(id);
+      return data;
+    } catch (err: any) {
+      return reply.status(400).send({ message: err.message });
+    }
+  });
+
+  // ثبت ارتباط و وابستگی جدید بین دو دارایی
+  app.post('/:id/relations', { preHandler: [requireEditor] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const schema = z.object({
+      targetAssetId: z.string().min(1, 'شناسه دارایی مقصد الزامی است'),
+      type: z.enum(['HOSTED_ON', 'DEPENDS_ON', 'POINTS_TO', 'BACKUP_OF', 'RELATED_TO']),
+      note: z.string().optional(),
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: parsed.error.errors[0].message });
+    }
+
+    const asset = await prisma.asset.findUnique({
+      where: { id },
+      select: { assetTypeId: true },
+    });
+
+    if (!asset) {
+      return reply.status(404).send({ message: 'دارایی مبدا یافت نشد.' });
+    }
+
+    if (!canAccessCategory(request.user!, asset.assetTypeId)) {
+      return reply.status(403).send({ message: 'شما اجازه ویرایش دارایی در این دسته را ندارید.' });
+    }
+
+    try {
+      const relation = await addAssetRelation({
+        sourceAssetId: id,
+        targetAssetId: parsed.data.targetAssetId,
+        type: parsed.data.type,
+        note: parsed.data.note,
+        userId: request.user!.id,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return reply.status(201).send(relation);
+    } catch (err: any) {
+      return reply.status(400).send({ message: err.message });
+    }
+  });
+
+  // حذف ارتباط دارایی
+  app.delete('/:id/relations/:relationId', { preHandler: [requireEditor] }, async (request, reply) => {
+    const { id, relationId } = request.params as { id: string; relationId: string };
+
+    const asset = await prisma.asset.findUnique({
+      where: { id },
+      select: { assetTypeId: true },
+    });
+
+    if (!asset) {
+      return reply.status(404).send({ message: 'دارایی مورد نظر یافت نشد.' });
+    }
+
+    if (!canAccessCategory(request.user!, asset.assetTypeId)) {
+      return reply.status(403).send({ message: 'شما اجازه ویرایش دارایی در این دسته را ندارید.' });
+    }
+
+    try {
+      const result = await deleteAssetRelation({
+        sourceAssetId: id,
+        relationId,
+        userId: request.user!.id,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return result;
+    } catch (err: any) {
+      return reply.status(400).send({ message: err.message });
+    }
+  });
 }
+
 
