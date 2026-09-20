@@ -242,27 +242,32 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex justify-start bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 lg:p-8 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[560px] max-w-full h-full bg-white dark:bg-surface-1 border-r border-slate-200 dark:border-border-strong shadow-2xl flex flex-col justify-between text-right cursor-default"
+        className="w-full max-w-5xl xl:max-w-6xl h-[92vh] max-h-[920px] bg-white dark:bg-surface-1 rounded-3xl border border-slate-200 dark:border-border-strong shadow-2xl flex flex-col overflow-hidden text-right cursor-default animate-in zoom-in-95 duration-200"
       >
-        {/* هدر کشو */}
-        <div className="p-5 border-b border-slate-200 dark:border-border-subtle shrink-0">
+        {/* هدر مودال */}
+        <div className="p-5 md:p-6 border-b border-slate-200 dark:border-border-subtle shrink-0 bg-slate-50/60 dark:bg-surface-2/40">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0 pr-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white truncate">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
                   {isNew ? `ثبت ${assetType.name} جدید` : title || 'مشخصات دارایی'}
                 </h2>
                 {!isNew && !isEditing && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-surface-2 dark:text-slate-300">
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 dark:bg-surface-2 dark:text-slate-300">
                     حالت مشاهده
                   </span>
                 )}
+                {isEditing && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                    حالت ویرایش
+                  </span>
+                )}
               </div>
-              <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 block mt-0.5">{assetType.name}</span>
+              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 block mt-1">{assetType.name}</span>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -273,7 +278,7 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
                     setActiveTab('props');
                     setIsEditing(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 font-semibold text-xs border border-indigo-200 dark:border-indigo-500/30 transition shadow-2xs"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 font-semibold text-xs border border-indigo-200 dark:border-indigo-500/30 transition shadow-2xs"
                   title="ویرایش مشخصات این دارایی"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
@@ -281,8 +286,10 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
                 </button>
               )}
               <button
+                type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-white dark:hover:bg-surface-2 transition"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-white dark:hover:bg-surface-2 transition"
+                title="بستن پنجره"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -290,7 +297,7 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
           </div>
 
           {/* تب‌ها */}
-          <div className="flex border-b border-slate-200 dark:border-border-subtle text-xs gap-6 mt-4 -mb-5">
+          <div className="flex border-b border-slate-200 dark:border-border-subtle text-xs gap-6 mt-4 -mb-5 md:-mb-6 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('props')}
               className={`pb-3 font-semibold transition border-b-2 flex items-center gap-1.5 ${
@@ -360,7 +367,7 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
         </div>
 
         {/* بدنه محتوا */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 md:p-6 lg:p-7">
           {activeTab === 'props' && (
             <div className="space-y-4">
               {!isEditing ? (
@@ -375,65 +382,68 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
                     <span className="font-medium text-[11px]">با کلیک روی هر فیلد، مقدار آن در حافظه کپی می‌شود.</span>
                   </div>
 
-                  {/* کارت عنوان اصلی */}
-                  <div
-                    onClick={() => handleCopyFieldValue('عنوان اصلی', title, '__title__', false)}
-                    className="group relative p-3.5 rounded-xl border border-slate-200 dark:border-border-strong bg-white hover:bg-indigo-50/40 dark:bg-surface-1 dark:hover:bg-surface-2 hover:border-indigo-300 dark:hover:border-indigo-500/50 cursor-pointer transition-all shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                        عنوان اصلی دارایی
-                      </span>
-                      {copiedFieldKey === '__title__' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30 animate-in fade-in">
-                          <Check className="w-3 h-3" />
-                          <span>کپی شد!</span>
+                  {/* کارت عنوان اصلی و کارت برچسب‌ها در سطر دوتایی */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* کارت عنوان اصلی */}
+                    <div
+                      onClick={() => handleCopyFieldValue('عنوان اصلی', title, '__title__', false)}
+                      className="group relative p-3.5 rounded-xl border border-slate-200 dark:border-border-strong bg-white hover:bg-indigo-50/40 dark:bg-surface-1 dark:hover:bg-surface-2 hover:border-indigo-300 dark:hover:border-indigo-500/50 cursor-pointer transition-all shadow-2xs"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                          عنوان اصلی دارایی
                         </span>
+                        {copiedFieldKey === '__title__' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30 animate-in fade-in">
+                            <Check className="w-3 h-3" />
+                            <span>کپی شد!</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition">
+                            <Copy className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                            <span>کلیک برای کپی</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm font-bold text-slate-900 dark:text-white">
+                        {title || <span className="text-slate-400 font-normal italic">بدون عنوان</span>}
+                      </div>
+                    </div>
+
+                    {/* بخش برچسب‌ها و نشان‌ها در حالت مشاهده */}
+                    <div className="p-3.5 rounded-xl border border-slate-200 dark:border-border-strong bg-white dark:bg-surface-1 shadow-2xs flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <span>برچسب‌ها و نشان‌ها (Labels & Tags)</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('props');
+                            setIsEditing(true);
+                          }}
+                          className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                        >
+                          ویرایش برچسب‌ها
+                        </button>
+                      </div>
+                      {tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {tags.map((t) => (
+                            <TagBadge key={t} tag={t} size="sm" showIcon />
+                          ))}
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition">
-                          <Copy className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
-                          <span>کلیک برای کپی</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 italic block">
+                          هنوز برچسبی برای این دارایی ثبت نشده است.
                         </span>
                       )}
                     </div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-white">
-                      {title || <span className="text-slate-400 font-normal italic">بدون عنوان</span>}
-                    </div>
                   </div>
 
-                  {/* بخش برچسب‌ها و نشان‌ها در حالت مشاهده */}
-                  <div className="p-3.5 rounded-xl border border-slate-200 dark:border-border-strong bg-white dark:bg-surface-1 shadow-2xs">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                        <span>برچسب‌ها و نشان‌ها (Labels & Tags)</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTab('props');
-                          setIsEditing(true);
-                        }}
-                        className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
-                      >
-                        ویرایش برچسب‌ها
-                      </button>
-                    </div>
-                    {tags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {tags.map((t) => (
-                          <TagBadge key={t} tag={t} size="sm" showIcon />
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400 dark:text-slate-500 italic block">
-                        هنوز برچسبی برای این دارایی ثبت نشده است.
-                      </span>
-                    )}
-                  </div>
-
-                  {/* کارت‌های فیلدهای داینامیک */}
-                  <div className="space-y-2.5">
+                  {/* کارت‌های فیلدهای داینامیک در شبکه ستونی متناسب */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {assetType.schemaDefinition.map((field) => {
                       const rawVal = formValues[field.name];
                       const isSecret = field.type === 'secret';
@@ -672,8 +682,8 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
           )}
         </div>
 
-        {/* فوتر کشو با دکمه‌های ذخیره و حذف */}
-        <div className="p-4 border-t border-slate-200 dark:border-border-subtle bg-slate-50/80 dark:bg-surface-2/40 flex items-center justify-between shrink-0">
+        {/* فوتر مودال با دکمه‌های ذخیره و حذف */}
+        <div className="p-4 sm:p-5 px-6 border-t border-slate-200 dark:border-border-subtle bg-slate-50/80 dark:bg-surface-2/40 flex items-center justify-between shrink-0 rounded-b-3xl">
           {!isNew ? (
             <button
               onClick={handleDelete}
