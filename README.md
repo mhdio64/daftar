@@ -1,126 +1,156 @@
-# 🗂️ سامانه «دفتر» (Daftar)
-> **سامانه امن و متمرکز مدیریت دارایی‌های سازمانی، اطلاعات محرمانه (Secrets)، مستندات فنی و سررسیدهای IT**
+# 🗂️ Daftar (دفتر)
+
+> **Secure, centralized enterprise IT asset management, secrets vault, technical documentation, and renewal automation platform.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
 ---
 
-## 🎯 معرفی سامانه
+## 🎯 Introduction
 
-در بسیاری از سازمان‌ها، اطلاعات حیاتی مانند مشخصات سرورها (VPS)، کلیدهای خصوصی SSH، رمزهای عبور دیتابیس‌ها، اکانت‌های اداری، لایسنس نرم‌افزارها و دامنه‌ها به صورت پراکنده در فایل‌های متنی ناامن، اکسل یا پیام‌رسان‌ها نگهداری می‌شوند. این موضوع سازمان را با خطرات جدی **نشت اطلاعات، عدم اطلاع از تاریخ انقضا و سررسید، و نبود سیستم ردیابی دسترسی‌ها** مواجه می‌کند.
+In many organizations and engineering teams, critical IT infrastructure details—such as virtual servers (VPS), SSH root credentials, database connection strings, cloud IAM tokens, software licenses, domain registrations, and network topology—are scattered across insecure spreadsheets, plaintext files, or internal chats. This creates serious vulnerabilities: **credential exposure, unmonitored access, missed expiration dates leading to downtime, and loss of institutional knowledge.**
 
-**«دفتر»** یک والت و پنل مدیریت جامع دارایی‌های IT سازمانی است که با رابط کاربری شکیل، تقویم جلالی، و **بالاترین استانداردهای امنیتی (OWASP)** طراحی شده است.
-
----
-
-## ✨ امکانات و قابلیت‌های کلیدی
-
-- 🔐 **رمزنگاری متقارن پیشرفته (AES-256-GCM):** فیلدهای محرمانه مانند رمزهای عبور و کلیدهای خصوصی در سطح پایگاه‌داده رمزنگاری شده و حتی با نفوذ مستقیم به دیتابیس قابل خواندن نیستند.
-- 🛡️ **احراز هویت دومرحله‌ای (2FA / TOTP):** سازگار با Google Authenticator و Microsoft Authenticator به همراه کدهای اضطراری بازیابی یکبارمصرف و هش‌شده.
-- 👁️ **ردیابی دسترسی به رمزها (Secret Unmask Tracking):** ثبت دقیق IP، زمان و نام کاربری که روی آیکون چشم کلیک کرده و رمز عبور را مشاهده یا کپی نموده است.
-- 🏷️ **شناسنامه فیزیکی و چاپ برچسب اموال:** تولید برچسب بارکد و QR Code آماده چاپ استاندارد برای چسباندن روی رک، سرورها و لپ‌تاپ‌های سازمانی + اسکنر دوربین موبایل.
-- ⏰ **اتوماسیون هشدارها و کرون‌جاب (Alerts Worker):** ارسال خودکار هشدارهای انقضای سرورها و دامنه‌ها در بازه‌های ۳۰، ۷ و ۱ روز مانده به پیام‌رسان‌های **بله، تلگرام، دیسکورد، ایمیل، پیامک و وب‌هوک**.
-- 📊 **خروجی اکسل و شناسنامه رسمی (Excel / PDF Export):** دانلود فایل‌های تمیز `.xlsx` برای واحد مالی و حسابداری به همراه پرینت رسمی شناسنامه اموال.
-- 👥 **مدیریت دسترسی نقش‌محور (RBAC & ABAC):** تفکیک نقش‌های Admin, Editor, Viewer و محدود کردن دسترسی اپراتورها به دسته‌بندی‌های خاص.
-- 📦 **پشتیبان‌گیری خودکار روزانه:** کانتینر ایزوله داکر برای تهیه نسخه‌های پشتیبان فشرده (`.sql.gz`) از دیتابیس با چرخش و نگهداری ۳۰ روزه.
+**Daftar** is a self-hosted, enterprise-grade IT Asset & Secrets Vault built with field-level **AES-256-GCM encryption**, zero-knowledge **2FA (TOTP)**, comprehensive **audit logging (secret unmask tracking)**, physical **asset QR/barcode tagging**, and multi-channel **expiration notification workers** (Telegram, Bale, Discord, SMS, Email, Webhook).
 
 ---
 
-## 🚀 راهنمای راه‌اندازی سریع با داکر (روش پیشنهادی)
+## ✨ Key Features
 
-ساده‌ترین و امن‌ترین راه برای راه‌اندازی کامل سامانه در شبکه سازمان استفاده از **Docker Compose** است:
+- 🔐 **Field-Level Encryption (AES-256-GCM):** Sensitive values (passwords, private keys, API secrets) are encrypted before hitting the database with randomized IVs and 16-byte authentication tags (Auth Tags). Plaintext is never stored in database dumps.
+- 🛡️ **Zero-Knowledge Two-Factor Authentication (2FA / RFC 6238):** Compatible with Google Authenticator, Microsoft Authenticator, and 1Password. TOTP secrets are encrypted at rest with AES-256, and emergency recovery codes are one-way hashed with SHA-256.
+- 👁️ **Secret Unmask & Copy Tracking (Audit Trail):** Every time a user clicks the reveal/eye icon or copies a secret to the clipboard, an audit record is logged with the user's ID, timestamp, and IP address.
+- 🏷️ **Physical Asset Tagging & Label Printing:** Generate printable, standardized asset stickers with corporate logos, unique asset codes, titles, and QR/barcodes. Includes an in-app mobile camera scanner.
+- ⏰ **Automated Expiration Alerts (Notification Worker):** Built-in background worker that dispatches threshold notifications (30 days, 7 days, 24 hours, and day of expiration) to **Telegram, Bale, Discord, SMS, Email, and custom Webhooks**, plus automated weekly digest summaries.
+- 📊 **Excel & PDF Dossier Exports:** One-click `.xlsx` exports for accounting and auditing, template generation for bulk imports, and formatted printable official asset dossier views.
+- 👥 **Role-Based & Category-Based Access Control (RBAC & ABAC):** Granular permission model separating `ADMIN`, `EDITOR`, and `VIEWER`, with per-category access restrictions.
+- 🛡️ **OWASP Hardened:** Includes protection against Server-Side Request Forgery (SSRF), Broken Object-Level Authorization (BOLA/IDOR), session hijacking (8-hour JWT expiration), brute-force throttling (`@fastify/rate-limit`), and security headers (`@fastify/helmet`).
+- 📦 **Automated Daily Backups:** Isolated Docker container generating daily compressed `.sql.gz` database dumps with automated 30-day retention rotation.
 
-### ۱. کلون کردن ریپازیتوری
+---
+
+## 🚀 Quick Start with Docker (Recommended)
+
+The easiest and most secure method to deploy Daftar on your internal network or VPS is using **Docker Compose**:
+
+### 1. Clone the repository
 ```bash
 git clone https://github.com/mhdio64/daftar.git
 cd daftar
 ```
 
-### ۲. تنظیم متغیرهای محیطی
-فایل نمونه را کپی کرده و در صورت نیاز مقادیر آن را تغییر دهید:
+### 2. Configure Environment Variables
+Copy the sample environment file:
 ```bash
 cp .env.example .env
 ```
+
 > [!IMPORTANT]
-> برای تولید کلید رمزنگاری ۶۴ کاراکتری اختصاصی خود، دستور زیر را اجرا کنید و مقدار آن را در متغیر `MASTER_ENCRYPTION_KEY` فایل `.env` قرار دهید:
+> Generate a cryptographically secure 32-byte (64 hexadecimal characters) master encryption key:
 > ```bash
 > openssl rand -hex 32
 > ```
+> Paste this key into the `MASTER_ENCRYPTION_KEY` variable in your `.env` file.
 
-### ۳. اجرای سامانه با داکر
+### 3. Start the Services
 ```bash
 docker compose up -d
 ```
-پس از اجرای دستور فوق، سرویس‌های زیر به طور خودکار بالا می‌آیند:
-- **پایگاه‌داده PostgreSQL 16**
-- **سرور بک‌اند Fastify**
-- **وب‌سرور امن Caddy با HTTPS خودکار داخلی**
-- **سرویس پشتیبان‌گیری خودکار روزانه**
 
-### ۴. ورود به سامانه
-* مرورگر خود را باز کرده و به آدرس زیر بروید:
-  **`http://localhost`** یا **`https://localhost`**
-* مشخصات ورود پیش‌فرض مدیر ارشد:
-  - **نام کاربری:** `admin`
-  - **رمز عبور:** `admin123456`
+This launches:
+- **PostgreSQL 16** database container
+- **Fastify API Server**
+- **Caddy Reverse Proxy** with automated local HTTPS
+- **Daily Database Backup Worker**
+
+### 4. Access the Application
+* Open your browser and navigate to:
+  **`http://localhost`** or **`https://localhost`**
+* Default initial administrator credentials:
+  - **Username:** `admin`
+  - **Password:** `admin123456`
 
 ---
 
-## 💻 راهنمای راه‌اندازی محلی برای توسعه (Development Mode)
+## 💻 Local Development Setup
 
-اگر مایلید پروژه را در محیط توسعه (Local Node.js) اجرا و ویرایش کنید:
+To run and contribute to the project locally using Node.js:
 
-### پیش‌نیازها:
-- Node.js نسخه 20 یا بالاتر
-- pnpm نسخه 9 یا بالاتر (`npm i -g pnpm`)
-- Docker (جهت اجرای پایگاه‌داده PostgreSQL)
+### Prerequisites:
+- **Node.js** >= 20.0.0
+- **pnpm** >= 9.0.0 (`npm install -g pnpm`)
+- **Docker** (for running PostgreSQL)
 
-### مراحل اجرا:
+### Setup Steps:
 
-1. **نصب وابستگی‌های پکیج‌ها:**
+1. **Install dependencies:**
    ```bash
    pnpm install
    ```
 
-2. **تنظیم فایل محیطی:**
+2. **Configure environment:**
    ```bash
    cp .env.example .env
    ```
 
-3. **اجرای کانتینر پایگاه‌داده:**
+3. **Start the PostgreSQL database:**
    ```bash
    docker compose up -d postgres
    ```
 
-4. **ساخت جداول و بارگذاری اطلاعات اولیه در دیتابیس:**
+4. **Sync database schema and seed standard types:**
    ```bash
    pnpm --filter daftar-server exec prisma db push
    pnpm --filter daftar-server prisma:seed
    ```
 
-5. **اجرای همزمان فرانت‌اند و بک‌اند:**
+5. **Start frontend and backend in watch mode:**
    ```bash
    pnpm dev
    ```
-   * پنل کلاینت (فرانت‌اند): `http://localhost:5173`
-   * سرور API (بک‌اند): `http://localhost:3000`
+   - Client UI: `http://localhost:5173`
+   - API Server: `http://localhost:3000`
 
 ---
 
-## 🔒 امنیت و محافظت از اطلاعات محرمانه (Security Best Practices)
+## 🔒 Security Best Practices
 
-- **تغییر رمز عبور پیش‌فرض:** پس از اولین ورود، فوراً از بخش «مدیریت کاربران» رمز عبور حساب `admin` را تغییر دهید.
-- **فعال‌سازی تایید دو مرحله‌ای:** از بخش «تنظیمات»، ویژگی ۲FA را فعال کرده و بارکد آن را با نرم‌افزارهای احراز هویت (مانند Google Authenticator) اسکن کنید.
-- **فایل‌های محرمانه:** فایل‌های `.env`، کلیدهای مستر و دایرکتوری `data/` در فایل `.gitignore` قرار دارند و هرگز نباید در ریپازیتوری گیت کامیت شوند.
-- **مقاومت در برابر Brute-force:** تعداد تلاش‌های لاگین به حداکثر ۱۰ درخواست در دقیقه محدود شده است.
-
----
-
-## 📦 نسخه پشتیبان و بازیابی اضطراری (Backup & Restore)
-
-### دریافت فایل بکاپ به دو روش:
-1. **از طریق پنل کاربری:** ورود به عنوان مدیر ارشد > مراجعه به تب «پشتیبان‌گیری» > کلیک روی دکمه «دریافت فایل پشتیبان (JSON)».
-2. **از طریق داکر (پایگاه‌داده کامل):** فایل‌های دامپ دیتابیس به طور روزانه در دایرکتوری `backups/` داکر با فرمت `.sql.gz` ذخیره می‌شوند.
+1. **Change Default Credentials:** Change the default `admin` password immediately after initial login from **User Management**.
+2. **Enable 2FA:** Set up Two-Factor Authentication under **Settings** and securely store the 8 emergency recovery codes.
+3. **Environment Isolation:** Ensure `.env` is never committed to source control. Production deployments must specify a unique `JWT_SECRET` and `MASTER_ENCRYPTION_KEY`.
+4. **Rate Limiting:** Authentication routes are rate-limited to 10 requests per minute per IP to prevent dictionary and credential stuffing attacks.
 
 ---
 
-## 📜 لایسنس
-این پروژه به صورت کدمنبع‌باز و تحت مجوز MIT منتشر شده است.
+## 📦 Disaster Recovery & Backups
+
+Daftar provides two backup tiers:
+1. **Application JSON Bundle:** Exported by administrators from **Settings > Backup & Restore** for cross-instance migration.
+2. **PostgreSQL Binary Dumps:** Daily automated `.sql.gz` database dumps saved to the `backups/` volume.
+
+To restore a database dump:
+```bash
+gunzip < backups/daftar_backup_YYYYMMDD_HHMMSS.sql.gz | docker exec -i daftar_postgres psql -U daftar_user -d daftar_db
+```
+
+---
+
+## 📚 Technical Documentation
+
+In-depth technical architecture and schema specifications are available in the [`docs/`](./docs/) directory:
+
+- [01. Architecture & Stack](./docs/01-architecture-and-stack.md)
+- [02. Data Model & Schema](./docs/02-data-model-and-schema.md)
+- [03. Security & Cryptography](./docs/03-security-and-encryption.md)
+- [04. UI/UX & Design Guidelines](./docs/04-ui-ux-and-components.md)
+- [05. Core Features Specification](./docs/05-core-features-spec.md)
+- [06. Deployment & Operations](./docs/06-deployment-and-operations.md)
+
+---
+
+## 📜 License
+
+This project is licensed under the [MIT License](LICENSE).

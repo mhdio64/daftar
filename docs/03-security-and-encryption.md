@@ -1,42 +1,42 @@
-# 🔐 سند ۰۳: امنیت، رمزنگاری و کنترل دسترسی (Security & RBAC)
+# 🔐 Document 03: Security, Cryptography & Access Control (RBAC)
 
 ---
 
-## ۱. الگوریتم و معماری رمزنگاری داده‌ها (Cryptographic Architecture)
+## 1. Cryptographic Architecture
 
-یکی از وجوه تمایز اصلی سامانه «دفتر»، تفکیک داده‌های عمومی از داده‌های محرمانه (رمزهای عبور، توکن‌ها، گواهی‌ها، پین‌ها) و رمزنگاری داده‌های حساس در سطح ستون‌ها و فیلدها (Field-Level Encryption) است.
+A key differentiator of **Daftar** is the strict physical and logical separation of non-sensitive metadata from sensitive enterprise secrets (passwords, private SSH keys, cloud API tokens, certificates). Sensitive data is encrypted at the field level before reaching the database.
 
-### ۱.۱. استاندارد رمزنگاری: AES-256-GCM
-برای رمزنگاری از الگوریتم **AES-256-GCM (Galois/Counter Mode)** استفاده می‌شود. این الگوریتم از نوع **رمزنگاری معتبر (Authenticated Encryption with Associated Data - AEAD)** است که همزمان دو مزیت کلیدی دارد:
-1. **محرمانگی (Confidentiality):** هیچ‌کس بدون کلید نمی‌تواند مقدار اصلی را بخواند.
-2. **یکپارچگی و اصالت (Integrity & Authenticity):** به کمک برچسب اعتبارسنجی (Auth Tag)، هرگونه دستکاری یا تخریب تعمدی دیتابیس توسط کدهای مخرب فوراً شناسایی شده و مانع از رمزگشایی مقادیر مخدوش می‌گردد.
+### 1.1. Cryptographic Standard: AES-256-GCM
+Daftar uses **AES-256-GCM (Galois/Counter Mode)**, an industry-standard **Authenticated Encryption with Associated Data (AEAD)** algorithm that provides two simultaneous security guarantees:
+1. **Confidentiality:** The plaintext is completely unreadable without the 256-bit master key.
+2. **Integrity & Authenticity:** A 16-byte authentication tag (Auth Tag) verifies that the ciphertext and initialization vector (IV) have not been tampered with. Any database corruption or intentional tampering causes decryption to fail immediately.
 
 ```mermaid
 flowchart TD
-    subgraph Encryption ["رمزنگاری هنگام ذخیره"]
-        PlainText["رمز عبور خام کاربر"] --> CryptoEnc["ماژول Crypto بک‌اند"]
-        MasterKey["کلید اصلی (Master Key 256-bit)"] --> CryptoEnc
-        RandomIV["بردار اولیه تصادفی (IV 12-byte)"] --> CryptoEnc
-        CryptoEnc --> CipherText["متن رمزشده (Ciphertext)"]
-        CryptoEnc --> AuthTag["برچسب احراز اصالت (Auth Tag 16-byte)"]
-        CipherText & AuthTag & RandomIV --> JSONStore[("ذخیره در ستون encrypted_values دیتابیس")]
+    subgraph Encryption ["Encryption on Record Save"]
+        PlainText["Raw Credential / Secret"] --> CryptoEnc["Backend Crypto Service"]
+        MasterKey["Master Key (256-bit Hex)"] --> CryptoEnc
+        RandomIV["Cryptographic Random IV (12-byte)"] --> CryptoEnc
+        CryptoEnc --> CipherText["Ciphertext (Hex)"]
+        CryptoEnc --> AuthTag["Authentication Tag (16-byte Hex)"]
+        CipherText & AuthTag & RandomIV --> JSONStore[("Stored in encrypted_values (JSONB)")]
     end
 
-    subgraph Decryption ["رمزگشایی هنگام درخواست مجاز"]
-        Req["درخواست کاربر مجاز + لاگ رویداد"] --> CryptoDec["ماژول Decrypt بک‌اند"]
+    subgraph Decryption ["Decryption on Authorized Access"]
+        Req["Authorized User Request + Audit Log"] --> CryptoDec["Backend Decrypt Service"]
         JSONStore --> CryptoDec
         MasterKey --> CryptoDec
-        CryptoDec -->|بررسی تطابق Auth Tag| ResultPlain["نمایش / کپی مستقیم به کلیپ‌بورد"]
+        CryptoDec -->|Verify Auth Tag Match| ResultPlain["Streamed to Memory / Clipboard"]
     end
 ```
 
-### ۱.۲. پیاده‌سازی مرجع در بک‌اند (Node.js Crypto):
+### 1.2. Cryptographic Implementation (Node.js Crypto):
 ```typescript
 import crypto from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 12; // طول بردار استاندارد برای GCM
-const MASTER_KEY = Buffer.from(process.env.MASTER_ENCRYPTION_KEY!, 'hex'); // کلید ۳۲ بایتی
+const IV_LENGTH = 12; // Standard 96-bit IV for GCM
+const MASTER_KEY = Buffer.from(process.env.MASTER_ENCRYPTION_KEY!, 'hex'); // 32-byte key
 
 export interface EncryptedPayload {
   iv: string;
@@ -75,38 +75,37 @@ export function decryptSecret(payload: EncryptedPayload): string {
 
 ---
 
-## ۲. ماتریس سطوح دسترسی (Role-Based Access Control - RBAC)
+## 2. Role-Based Access Control (RBAC) Matrix
 
-دسترسی کاربران به ۳ نقش اصلی و تفکیک بر اساس دسته‌بندی‌های مجاز تقسیم می‌شود:
+Access permissions are enforced across three user roles and further constrained by category-level permissions:
 
-| قابلیت / عملیات | مدیر ارشد (Super Admin) | اپراتور / مدیر فنی (Editor) | مسئول خرید و بیننده (Viewer / Procurement) |
+| Capability / Operation | Super Admin (`ADMIN`) | Technical Lead / Operator (`EDITOR`) | Auditor / Viewer (`VIEWER`) |
 | :--- | :---: | :---: | :---: |
-| مشاهده و ویرایش ساختار فیلدها (Schema) | ✅ | ❌ | ❌ |
-| مدیریت کاربران و تخصیص دسترسی | ✅ | ❌ | ❌ |
-| ایجاد و ویرایش رکوردهای دارایی | ✅ | ✅ (دسته‌های مجاز) | ❌ |
-| حذف دارایی‌ها | ✅ | ✅ (دسته‌های مجاز) | ❌ |
-| مشاهده مشخصات عمومی (IP، نام، توضیحات) | ✅ | ✅ (دسته‌های مجاز) | ✅ (دسته‌های مجاز) |
-| مشاهده و کپی رمزهای عبور (Reveal Secret) | ✅ | ✅ (با ثبت در لاگ) | ❌ (یا نیازمند مجوز صریح) |
-| مشاهده و ویرایش یادآورهای سررسید | ✅ | ✅ | ✅ (دسته‌های مجاز) |
-| ثبت سوابق تمدید و فاکتورها | ✅ | ✅ | ✅ |
-| مشاهده تاریخچه ممیزی و لاگ‌های امنیتی | ✅ | ❌ | ❌ |
-| خروجی اکسل و گزارش‌گیری | ✅ | ✅ | ✅ (بدون فیلدهای پسورد) |
+| Modify dynamic schema definitions | ✅ | ❌ | ❌ |
+| Manage users, roles & category permissions | ✅ | ❌ | ❌ |
+| Create & edit asset records | ✅ | ✅ (Assigned categories) | ❌ |
+| Delete asset records | ✅ | ✅ (Assigned categories) | ❌ |
+| View non-sensitive metadata (IP, Hostname, Notes) | ✅ | ✅ (Assigned categories) | ✅ (Assigned categories) |
+| Reveal & copy secret credentials (Unmask) | ✅ | ✅ (Logged in audit trail) | ❌ |
+| View & manage expiration alerts | ✅ | ✅ | ✅ (Assigned categories) |
+| Log renewal payments & invoices | ✅ | ✅ | ✅ (Assigned categories) |
+| Access security audit logs | ✅ | ❌ | ❌ |
+| Export inventory reports to Excel | ✅ | ✅ | ✅ (Secrets stripped) |
 
 ---
 
-## ۳. حفاظت از نشت رمز عبور در گزارش‌ها و لاگ‌ها (Leak Prevention)
+## 3. Secret Leakage Prevention & Audit Trail
 
-1. **مستثنی‌سازی از سرچ سراسری:** مقادیر فیلدهای نوع `secret` تحت هیچ شرایطی ایندکس متنی نمی‌شوند و در نتایج کوئری جستجوی عمومی برگردانده نمی‌شوند.
-2. **پالایش Diff در لاگ تغییرات:** زمانی که کاربری رمز عبور یک سرور را ویرایش می‌کند، در جدول `AuditLog` تنها تغییر وضعیت ثبت می‌شود:
+1. **Excluded from Global Search:** Attributes designated as `secret` are never indexed into PostgreSQL full-text search and are never returned in search query payloads.
+2. **Sanitized Mutation Diffs:** When an asset's password is changed, the `AuditLog` entry captures only that the field changed, never storing the old or new secret:
    ```json
-   // مقدار ذخیره شده در دیتابیس برای لاگ ویرایش پسورد:
    {
      "field": "root_password",
      "action": "VALUE_CHANGED",
-     "note": "رمز عبور توسط کاربر ویرایش شد (مقدار ثبت نمی‌گردد)"
+     "note": "Credential modified by user (secret value redacted)"
    }
    ```
-3. **لاگ‌گیری رویدادهای بازگشایی (Read Audit):** با توجه به اینکه کپی یا نمایش پسورد یک عملیات حساس است، حتی اگر هیچ تغییری صورت نگیرد، عمل «مشاهده/کپی» در دیتابیس لاگ می‌شود:
+3. **Secret Unmask & Copy Auditing:** Because viewing or copying credentials is a security-sensitive event, every reveal or clipboard copy triggers an audit entry:
    ```json
    {
      "userId": "usr_9981",
@@ -115,17 +114,18 @@ export function decryptSecret(payload: EncryptedPayload): string {
      "targetId": "ast_4420",
      "field": "root_password",
      "ipAddress": "192.168.1.45",
-     "createdAt": "2026-09-19T16:20:00Z"
+     "createdAt": "2026-09-22T00:15:00Z"
    }
    ```
 
 ---
 
-## ۴. نیازمندی‌های مرورگر و کپی کلیپ‌بورد در شبکه داخلی (Clipboard Security & HTTPS)
+## 4. Clipboard Security & HTTPS Requirements
 
-طبق استاندارد وب W3C، متد `navigator.clipboard.writeText()` به دلایل امنیتی صرفاً در محیط‌های امن (**Secure Context**) فعال است:
-- محیط امن شامل `https://` و یا دامنه `localhost` است.
-- اگر برنامه روی `http://192.168.1.100` اجرا شود، دکمه کپی مرورگر با خطای امنیتی مسدود خواهد شد.
+In accordance with W3C web standards, `navigator.clipboard.writeText()` is restricted exclusively to **Secure Contexts**:
+- Secure contexts include `https://` or `localhost`.
+- Accessing the app over plain HTTP via an intranet IP (e.g. `http://192.168.1.100`) causes modern browsers to block clipboard operations.
 
-### راه‌حل پیاده‌سازی شده:
-کانتینر وب‌سرور معکوس `Caddy` به صورت خودکار یک گواهی SSL محلی (Internal CA / Self-Signed) تولید کرده و تمام ترافیک را روی پورت `443 (HTTPS)` قرار می‌دهد. همچنین در فرانت‌اند یک مکانیزم پشتیبان (Fallback) با استفاده از `document.execCommand('copy')` تعبیه می‌شود تا در هر شرایطی فرآیند کپی بدون خطا انجام شود.
+### Deployment Solution:
+1. The included **Caddy reverse proxy** container automatically issues an internal self-signed TLS certificate (`tls internal`) and serves traffic over `443 (HTTPS)`.
+2. The frontend client includes a fallback using a legacy hidden textarea selection method, ensuring copy operations succeed even in restricted network edge cases.

@@ -1,23 +1,23 @@
-# 🗄️ سند ۰۲: مدل داده و ساختار پایگاه‌داده (Data Model & Schema)
+# 🗄️ Document 02: Data Model & Database Schema
 
 ---
 
-## ۱. دیاگرام روابط موجودیت‌ها (ER Diagram)
+## 1. Entity Relationship (ER) Diagram
 
-پایگاه داده سامانه «دفتر» در PostgreSQL پیاده‌سازی شده و ترکیبی هوشمندانه از جداول رابطه‌ای ساخت‌یافته و ستون‌های بدون‌طرح (Schemaless JSONB) است.
+Daftar is backed by PostgreSQL, employing a hybrid data architecture combining structured relational tables with flexible schemaless `JSONB` columns for user-defined attributes.
 
 ```mermaid
 erDiagram
-    User ||--o{ Asset : "ایجاد کرده / ویرایش کرده"
-    User ||--o{ AuditLog : "ثبت رویداد توسط"
-    User ||--o{ RenewalLog : "ثبت تمدید توسط"
-    User ||--o{ Attachment : "آپلود کرده"
+    User ||--o{ Asset : "creates / updates"
+    User ||--o{ AuditLog : "triggers events"
+    User ||--o{ RenewalLog : "records renewals"
+    User ||--o{ Attachment : "uploads"
     
-    AssetType ||--o{ Asset : "تعریف می‌کند نمونه‌های"
-    AssetType ||--o{ Attachment : "پیوست‌های سطح دسته"
+    AssetType ||--o{ Asset : "defines instances of"
+    AssetType ||--o{ Attachment : "category-level attachments"
     
-    Asset ||--o{ Attachment : "پیوست‌های تک رکورد"
-    Asset ||--o{ RenewalLog : "تاریخچه تمدیدها"
+    Asset ||--o{ Attachment : "record-level attachments"
+    Asset ||--o{ RenewalLog : "renewal history"
     
     User {
         string id PK
@@ -25,20 +25,23 @@ erDiagram
         string fullName
         string passwordHash
         enum role "ADMIN | EDITOR | VIEWER"
-        jsonb categoryPermissions "لیست دسترسی به شناسه دسته‌ها"
+        jsonb categoryPermissions "Array of permitted asset type IDs"
         boolean isActive
+        string totpSecret "Encrypted TOTP Secret (AES-256)"
+        boolean totpEnabled
+        jsonb recoveryCodes "Hashed recovery codes (SHA-256)"
         datetime createdAt
         datetime updatedAt
     }
 
     AssetType {
         string id PK
-        string name "نام نمایشی فارسی"
-        string slug UK "نام یکتا به انگلیسی"
-        string icon "نام آیکون Lucide"
+        string name "Display name"
+        string slug UK "Unique URL-friendly slug"
+        string icon "Lucide icon identifier"
         string description
-        jsonb schemaDefinition "آرایه‌ای از فیلدهای داینامیک"
-        text typeDocsMarkdown "مستندات راهنمای کلی دسته"
+        jsonb schemaDefinition "Array of custom field definitions"
+        text typeDocsMarkdown "Category-wide operational runbook"
         int displayOrder
         datetime createdAt
         datetime updatedAt
@@ -47,11 +50,12 @@ erDiagram
     Asset {
         string id PK
         string assetTypeId FK
-        string title "عنوان دارایی مثلا سرور اصلی دیتاسنتر"
-        jsonb values "مقادیر فیلدهای عادی"
-        jsonb encryptedValues "مقادیر رمزنگاری شده AES"
-        datetime expiryDate "تاریخ سررسید انقضا در صورت وجود"
-        text docsMarkdown "مستندات اختصاصی این رکورد"
+        string title "Asset title (e.g. Primary Tehran DB Server)"
+        string assetCode "Unique physical asset tag identifier"
+        jsonb values "Unencrypted custom field values"
+        jsonb encryptedValues "AES-256-GCM encrypted secrets"
+        datetime expiryDate "Expiration / renewal due date"
+        text docsMarkdown "Asset-specific technical documentation"
         string createdById FK
         string updatedById FK
         datetime createdAt
@@ -60,10 +64,10 @@ erDiagram
 
     Attachment {
         string id PK
-        string assetTypeId FK "اختیاری - در صورت پیوست به کل دسته"
-        string assetId FK "اختیاری - در صورت پیوست به تک رکورد"
-        string originalName "نام اصلی فایل"
-        string storagePath "مسیر فایل روی دیسک"
+        string assetTypeId FK "Optional: category attachment"
+        string assetId FK "Optional: asset-specific attachment"
+        string originalName "Original uploaded file name"
+        string storagePath "Path on disk / volume"
         string mimeType
         int sizeBytes
         string uploadedById FK
@@ -76,7 +80,7 @@ erDiagram
         string action "CREATE | UPDATE | DELETE | READ_SECRET"
         string targetEntity "Asset | AssetType | User"
         string targetId
-        jsonb diff "تغییرات فیلدها از مقدار قدیم به جدید"
+        jsonb diff "Old vs. new value differential"
         string ipAddress
         datetime createdAt
     }
@@ -86,8 +90,8 @@ erDiagram
         string assetId FK
         datetime previousExpiryDate
         datetime newExpiryDate
-        bigint cost "مبلغ تمدید به ریال/تومان"
-        string note "توضیحات و شماره فاکتور"
+        bigint cost "Renewal cost in currency units"
+        string note "Invoice number and payment notes"
         string renewedById FK
         datetime renewedAt
     }
@@ -95,43 +99,43 @@ erDiagram
 
 ---
 
-## ۲. طراحی فیلدهای داینامیک (`schemaDefinition`)
+## 2. Dynamic Field Definition (`schemaDefinition`)
 
-یکی از کلیدی‌ترین بخش‌های سامانه دفتر، تعریف ساختار فیلدها به صورت داینامیک برای هر نوع دارایی است. این فیلدها در ستون `schemaDefinition` جدول `AssetType` به شکل یک آرایه JSON ذخیره می‌شوند:
+A core capability of Daftar is allowing administrators to define custom field structures for any asset type without running database migrations. These definitions are stored in the `schemaDefinition` column of `AssetType` as a JSON array.
 
-### ۲.۱. تایپ تایپ‌اسکریپت ساختار فیلد:
+### 2.1. TypeScript Interface for Dynamic Fields
 ```typescript
 export type FieldType = 
-  | 'text'          // متن کوتاه تک‌خطی (نام دامنه، نام کاربری و...)
-  | 'email'         // آدرس ایمیل با آیکون و لینک mailto
-  | 'textarea'      // توضیحات چندخطی
-  | 'secret'        // پسورد، کلید خصوصی، توکن امنیتی (رمزنگاری شده و ماسک‌شده)
-  | 'ip_port'       // آدرس آی‌پی به همراه پورت اختیاری (مثلاً 192.168.1.10:22)
-  | 'url'           // لینک وب با آیکون هدایت مستقیم
-  | 'jalali_date'   // تاریخ شمسی (با امکان فعال‌سازی هشدار تمدید)
-  | 'select';       // لیست انتخابی کشویی با گزینه‌های از پیش تعریف شده
+  | 'text'          // Single-line text (hostname, domain name, username)
+  | 'email'         // Email address with mailto action
+  | 'textarea'      // Multi-line descriptions and notes
+  | 'secret'        // Encrypted credentials, API tokens, private keys
+  | 'ip_port'       // IP address with optional port (e.g. 192.168.1.10:22)
+  | 'url'           // Web URL with direct navigation link
+  | 'jalali_date'   // Solar/Gregorian date with expiration alerting
+  | 'select';       // Single-select dropdown from predefined options
 
 export interface FieldDefinition {
-  id: string;              // شناسه یکتای فیلد در اسکیما (مثلاً "f_ip_addr")
-  name: string;            // کلید ذخیره‌سازی در دیتابیس (مثلاً "server_ip")
-  label: string;           // برچسب فارسی نمایش (مثلاً "آدرس آی‌پی")
-  type: FieldType;         // نوع فیلد
-  isRequired: boolean;     // آیا وارد کردن آن اجباری است؟
-  placeholder?: string;    // راهنمای داخل فیلد
-  options?: string[];      // گزینه‌ها برای نوع select
-  isSecret?: boolean;      // آیا در ستون رمزنگاری‌شده نگهداری شود؟
-  showInTable: boolean;    // آیا به صورت پیش‌فرض در جدول اکسل‌گونه ستون باشد؟
-  order: number;           // ترتیب نمایش در فرم و جدول
+  id: string;              // Unique schema identifier (e.g. "f_ip_addr")
+  name: string;            // Key stored in JSONB columns (e.g. "server_ip")
+  label: string;           // Display label (e.g. "IP Address")
+  type: FieldType;         // Data type
+  isRequired: boolean;     // Mandatory validation flag
+  placeholder?: string;    // Input placeholder text
+  options?: string[];      // Predefined options for select type
+  isSecret?: boolean;      // Stored in encryptedValues vs. values
+  showInTable: boolean;    // Default visibility in the Excel grid view
+  order: number;           // Display order in forms and grid
 }
 ```
 
-### ۲.۲. نمونه واقعی `schemaDefinition` برای نوع دارایی «سرور مجازی (VPS)»:
+### 2.2. Production Example: "Virtual Private Server (VPS)" Schema
 ```json
 [
   {
     "id": "f_1",
     "name": "ip_address",
-    "label": "آدرس IP",
+    "label": "IP Address",
     "type": "ip_port",
     "isRequired": true,
     "showInTable": true,
@@ -140,7 +144,7 @@ export interface FieldDefinition {
   {
     "id": "f_2",
     "name": "ssh_port",
-    "label": "پورت SSH",
+    "label": "SSH Port",
     "type": "text",
     "isRequired": false,
     "showInTable": true,
@@ -149,7 +153,7 @@ export interface FieldDefinition {
   {
     "id": "f_3",
     "name": "root_user",
-    "label": "نام کاربری",
+    "label": "Username",
     "type": "text",
     "isRequired": true,
     "showInTable": true,
@@ -158,7 +162,7 @@ export interface FieldDefinition {
   {
     "id": "f_4",
     "name": "root_password",
-    "label": "رمز عبور Root",
+    "label": "Root Password",
     "type": "secret",
     "isRequired": true,
     "isSecret": true,
@@ -168,9 +172,9 @@ export interface FieldDefinition {
   {
     "id": "f_5",
     "name": "os_type",
-    "label": "سیستم عامل",
+    "label": "Operating System",
     "type": "select",
-    "options": ["Ubuntu 22.04", "Ubuntu 24.04", "Debian 12", "Windows Server 2022", "Rocky Linux"],
+    "options": ["Ubuntu 22.04", "Ubuntu 24.04", "Debian 12", "Windows Server 2022", "Rocky Linux 9"],
     "isRequired": false,
     "showInTable": true,
     "order": 5
@@ -178,7 +182,7 @@ export interface FieldDefinition {
   {
     "id": "f_6",
     "name": "expiry_date",
-    "label": "تاریخ سررسید تمدید",
+    "label": "Renewal Expiry Date",
     "type": "jalali_date",
     "isRequired": false,
     "showInTable": true,
@@ -189,11 +193,11 @@ export interface FieldDefinition {
 
 ---
 
-## ۳. تفکیک مقادیر آشکار و پنهان در جدول `Asset`
+## 3. Storage Separation: Cleartext vs. Encrypted Values
 
-برای تضمین حداکثر امنیت و در عین حال حفظ سرعت جستجو:
-- **ستون `values (JSONB)`:** تمامی فیلدهای متنی غیرمحرمانه ذخیره می‌شوند.
-- **ستون `encryptedValues (JSONB)`:** فیلدهای امنیتی (مانند پسوردها و توکن‌ها) پس از رمزنگاری با فرمت زیر ذخیره می‌شوند:
+To ensure strict zero-leakage security while maintaining high-speed indexing:
+- **`values (JSONB)` column:** Stores all unencrypted, searchable attributes.
+- **`encryptedValues (JSONB)` column:** Stores sensitive secrets encrypted with AES-256-GCM. Each field is serialized as an envelope containing its initialization vector, authentication tag, and ciphertext:
 
 ```json
 {
@@ -207,29 +211,30 @@ export interface FieldDefinition {
 
 ---
 
-## ۴. استراتژی ایندکس‌گذاری و کارایی (Database Indexing Strategy)
+## 4. Database Indexing Strategy
 
-برای تضمین سرعت بی‌درنگ در هنگام جستجوی سریع در رکوردهای زیاد:
+To guarantee sub-50ms query response times even across large asset inventories:
 
 ```sql
--- ایندکس‌های کلیدهای خارجی و ستون‌های پرکاربرد
+-- Foreign keys and high-frequency filter indexes
 CREATE INDEX idx_assets_type_id ON "Asset"("assetTypeId");
 CREATE INDEX idx_assets_expiry ON "Asset"("expiryDate") WHERE "expiryDate" IS NOT NULL;
+CREATE INDEX idx_assets_code ON "Asset"("assetCode");
 CREATE INDEX idx_audit_created_at ON "AuditLog"("createdAt" DESC);
 CREATE INDEX idx_audit_user_id ON "AuditLog"("userId");
 
--- ایندکس معکوس کلی (GIN) روی ستون مقادیر JSONB برای جستجوی متنی فوق‌سریع
+-- Generalized Inverted Index (GIN) on values JSONB for instant custom attribute searches
 CREATE INDEX idx_assets_values_gin ON "Asset" USING gin ("values" jsonb_path_ops);
 
--- ایندکس ترکیبی جستجوی متنی روی عنوان دارایی
+-- Trigram indexing on asset title for fuzzy search
 CREATE INDEX idx_assets_title_trgm ON "Asset" USING gin ("title" gin_trgm_ops);
 ```
 
 ---
 
-## ۵. تکامل طرح و سناریوهای تغییر ساختار (Schema Evolution Rules)
+## 5. Schema Evolution Rules
 
-چنانچه مدیر سیستم ساختار یک نوع دارایی را بعداً تغییر دهد، قواعد زیر اعمال می‌شود:
-1. **افزودن فیلد جدید:** فیلد جدید در اسکیما اضافه می‌شود. رکوردهای موجود مقدار `null` برای این فیلد دارند و هیچ خطایی در برنامه ایجاد نمی‌شود.
-2. **حذف فیلد:** فیلد از `schemaDefinition` حذف می‌شود. مقادیر ذخیره‌شده قبلی در دیتابیس باقی می‌مانند (Soft Delete در سطح UI) تا اطلاعات گذشته از بین نرود.
-3. **تغییر نوع فیلد:** سیستم هشدار می‌دهد؛ در صورت تغییر، مقادیر فیلد در رکوردهای موجود به فرمت جدید Cast یا به صورت خام نمایش داده می‌شوند.
+When an administrator updates an asset type's schema:
+1. **Adding a New Field:** The field is appended to `schemaDefinition`. Existing records default to `null` for this attribute without throwing database errors.
+2. **Deleting a Field:** The field is removed from `schemaDefinition`. Historical values stored in database rows are preserved (soft deprecation at the UI layer) to prevent irreversible data loss.
+3. **Changing Field Types:** A validation warning is displayed. Existing stored values are either safely cast or rendered as raw text.

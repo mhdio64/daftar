@@ -1,76 +1,76 @@
-# 🎨 سند ۰۴: طراحی رابط و تجربه کاربری (UI/UX & Components)
+# 🎨 Document 04: UI/UX & Component Guidelines
 
 ---
 
-## ۱. اصول طراحی بصری و زبان طراحی (Design System Principles)
+## 1. Design System Principles
 
-رابط کاربری «دفتر» بر پایه رویکرد مدرن، مینیمال و داده‌محور (مشابه نرم‌افزارهای روز دنیا نظیر Notion و Linear) با بومی‌سازی عمیق برای زبان فارسی و فرهنگ سازمانی ایران طراحی شده است.
+The user interface of **Daftar** is built with a modern, dense, and data-driven approach inspired by tools like Linear and Notion, tailored for enterprise IT and DevOps workflows.
 
-### ۱.۱. استاندارد راست‌چین (RTL) و تایپوگرافی
-- **جهت صفحه:** تمام عناصر به صورت طبیعی `dir="rtl"` چیدمان می‌شوند.
-- **تایپوگرافی:** استفاده از خانواده فونت **وزیرمتن (Vazirmatn)** در وزن‌های مختلف (`Light`, `Regular`, `Medium`, `Bold`).
-- **مدیریت ارقام و داده‌های فنی:**
-  * نام‌ها، توضیحات و عناوین فارسی با ارقام فارسی رندر می‌شوند.
-  * آدرس‌های IP، پورت‌ها، رشته‌های هش و رمزهای عبور همواره با جهت **LTR** و فونت Monospace استاندارد (`JetBrains Mono` یا `Consolas`) نمایش داده می‌شوند تا از هرگونه به هم ریختگی ترتیب اعداد و نقطه‌ها جلوگیری شود.
+### 1.1. Typography & Bidirectional Standards
+- **Page Layout:** Native RTL support with full LTR technical data embedding.
+- **Typography:** **Vazirmatn** font family in multiple weights (Light, Regular, Medium, Bold) for UI elements, labels, and documentation.
+- **Technical Data Presentation:**
+  * Hostnames, descriptions, and category labels render naturally in Persian/English text direction.
+  * IP addresses, port numbers, hash strings, and credentials always render with strict **LTR** direction and monospace typography (`JetBrains Mono` or `Consolas`) to prevent confusing punctuation and dot reordering.
 
-### ۱.۲. پالت رنگی (Color Palette)
-- **رنگ اصلی (Primary):** نیلی عمیق (`Indigo 600` / `#4F46E5`) برای تعاملات، دکمه‌های اصلی و حالت فعال.
-- **رنگ‌های وضعیت سررسید (Status Colors):**
-  * 🔴 **بحرانی / منقضی شده:** قرمز (`Rose 600`)
-  * 🟠 **هشدار فوری (کمتر از ۷ روز):** نارنجی پررنگ (`Amber 600`)
-  * 🟡 **نزدیک به سررسید (کمتر از ۳۰ روز):** زرد مایل به طلایی (`Yellow 600`)
-  * 🟢 **عادی / معتبر:** زمردی (`Emerald 600`)
-- **پس‌زمینه‌ها:** طیف رنگ‌های Slate مدرن با پشتیبانی از حالت روز و شب (Dark/Light Mode).
+### 1.2. Color Palette
+- **Primary Accent:** Deep Indigo (`Indigo 600` / `#4F46E5`) for primary actions, focus rings, and active states.
+- **Renewal Status Badges:**
+  * 🔴 **Critical / Expired:** Rose (`Rose 600`)
+  * 🟠 **Urgent Warning (< 7 days):** Amber (`Amber 600`)
+  * 🟡 **Approaching Expiry (< 30 days):** Yellow (`Yellow 600`)
+  * 🟢 **Normal / Healthy:** Emerald (`Emerald 600`)
+- **Neutral Canvas:** High-contrast Slate palette with seamless Dark/Light mode switching.
 
 ---
 
-## ۲. چیدمان کلان رابط کاربری (Layout Architecture)
+## 2. Layout Architecture
 
-رابط کاربری از ۳ بخش ساختاری اصلی تشکیل شده است:
+The application layout is structured into three primary synchronized zones:
 
 ```plaintext
 +---------------------------------------------------------------------------------------------+
-|                                    هدر بالایی (Header)                                      |
-| [🔍 جستجوی سریع جهانی (Ctrl + K)]               [🔔 یادآورهای سررسید]    [👤 کاربر: علی رضایی] |
+|                                      Top Navigation Bar                                     |
+| [🔍 Global Search (Ctrl + K)]                   [🔔 Expiration Radar]    [👤 User: Admin]   |
 +------------------+--------------------------------------------------------------------------+
-|  سایدبار اصلی    | نوار ابزار دسته: [➕ دارایی جدید] [📖 مستندات دسته] [⚙️ تنظیم فیلدها] [📤 اکسل] |
+|  Main Sidebar    | Category Toolbar: [➕ New Asset] [📖 Category Wiki] [⚙️ Schema] [📤 Excel] |
 |                  +--------------------------------------------------------------------------+
-|  🗂️ دفتر          | جدول اکسل‌گونه داده‌ها (Data Grid View):                                  |
+|  🗂️ Daftar       | Advanced Data Grid View:                                                 |
 |                  | +----+-----------------+----------------+--------------+------------------+ |
-|  📋 سرورها (VPS) | | ID | عنوان سرور      | آدرس IP / پورت | نام کاربری   | رمز عبور         | |
-|  ✉️ ایمیل‌ها     | +----+-----------------+----------------+--------------+------------------+ |
-|  🌐 دامنه‌ها      | | ۱  | سرور اصلی تهران | 192.168.10.15  | root 📋      | •••••••• 👁️ 📋   | |
-|  🔑 لایسنس‌ها    | | ۲  | سرور تست بکاپ   | 10.0.8.20:8080 | deploy 📋    | •••••••• 👁️ 📋   | |
-|  ➕ دسته جدید    | +----+-----------------+----------------+--------------+------------------+ |
+|  🖥️ VPS Servers  | | ID | Asset Title     | IP Address/Port| Username     | Password         | |
+|  ✉️ Mailboxes    | +----+-----------------+----------------+--------------+------------------+ |
+|  🌐 Domains      | | 1  | Tehran Main DB  | 192.168.10.15  | root 📋      | •••••••• 👁️ 📋   | |
+|  🔑 Licenses     | | 2  | Frankfurt Node  | 10.0.8.20:8080 | deploy 📋    | •••••••• 👁️ 📋   | |
+|  ➕ New Category | +----+-----------------+----------------+--------------+------------------+ |
 |  ----------------|                                                                          |
-|  ⏰ سررسیدها (۳) |  [ ◀ صفحه قبلی ]      [ صفحه ۱ از ۱۲ ]             [ صفحه بعدی ▶ ]          |
-|  📜 گزارش لاگ‌ها |                                                                          |
-|  👥 مدیریت اعضا  |                                                                          |
+|  ⏰ Renewals (3) |  [ ◀ Previous ]              [ Page 1 of 12 ]               [ Next ▶ ]     |
+|  📜 Audit Logs   |                                                                          |
+|  👥 Users & RBAC |                                                                          |
 +------------------+--------------------------------------------------------------------------+
 ```
 
 ---
 
-## ۳. کامپوننت‌های کلیدی (Core Components)
+## 3. Core Components
 
-### ۳.۱. جدول اکسل‌گونه پیشرفته (Data Grid Component)
-- **هدر ثابت (Sticky Header):** هنگام اسکرول به پایین، هدر جدول ثابت می‌ماند.
-- **کپی با ۱-کلیک (Instant 1-Click Copy):** روی هر مقدار مانند آدرس IP، نام کاربری یا پسورد، یک آیکون کوچک کپی تعبیه شده که با کلیک روی آن، مقدار بلافاصله در کلیپ‌بورد قرار گرفته و یک توست (Toast) سبز رنگ *"کپی شد!"* نمایش داده می‌شود.
-- **کنترل نمایش ستون‌ها (Column Visibility Picker):** کاربر می‌تواند با یک منوی کشویی انتخاب کند کدام فیلدها روی جدول دیده شوند و کدام مخفی بمانند.
-- **ماسک هوشمند پسورد:** مقادیر رمز به صورت نقاط گلوله‌ای `••••••••` رندر می‌شوند. دکمه چشم (👁️) مقدار را بازگشایی می‌کند و دکمه کپی (📋) آن را بدون نیاز به آشکار شدن مستقیماً کپی می‌کند.
+### 3.1. Advanced Data Grid Component
+- **Sticky Header & First Column:** Keeps table column headers and asset titles visible during horizontal and vertical scrolling.
+- **1-Click Copy:** Technical values (IP addresses, usernames, passwords) feature an inline copy button with immediate visual feedback (green checkmark and *"Copied!"* toast).
+- **Column Visibility Picker:** Users can customize and persist which columns appear in the grid using local storage.
+- **Smart Password Masking:** Secrets render as bullets (`••••••••`). The eye icon unmasks the credential with a 30-second countdown, while the copy icon copies the plaintext directly without displaying it on screen.
 
-### ۳.۲. کشوی بازشونده جزئیات و مستندات (Slide-over Detail Drawer)
-با کلیک روی هر سطر جدول، یک پنل کشویی نرم از سمت چپ صفحه باز می‌شود که شامل تب‌های زیر است:
-1. **مشخصات کامل:** نمایش و ویرایش تمامی فیلدهای عادی و محرمانه با اعتبارسنجی فرم.
-2. **مستندات اختصاصی (Markdown Editor & Viewer):** ویرایشگر متن مارک‌داون با پیش‌نمایش زنده برای نوشتن دستورالعمل‌های اختصاصی آن سرور، نحوه اتصال VPN یا کلیدهای عمومی.
-3. **فایل‌های پیوست (Attachments Dropzone):** بخش درگ‌اند-دراپ برای آپلود فایل‌های پیکربندی (`.conf`, `.ovpn`, `.key`, `.pdf`) تا سقف ۵۰ مگابایت با امکان دانلود مستقیم.
-4. **تاریخچه تغییرات (Audit History):** نمایش لیست تغییراتی که مشخصاً روی همین تک دارایی رخ داده است.
-5. **وضعیت تمدید و هزینه:** نمایش تاریخ سررسید شمسی و دکمه ثبت تمدید دوره جدید.
+### 3.2. Slide-over Detail Drawer
+Clicking any table row opens a smooth slide-over drawer from the screen margin, containing:
+1. **Properties:** Comprehensive form for viewing and editing all dynamic and encrypted fields with inline validation.
+2. **Technical Runbook (Markdown Editor & Preview):** Asset-specific operational documentation, firewall rules, and deployment instructions.
+3. **Attachments Dropzone:** Drag-and-drop file uploader supporting `.conf`, `.ovpn`, `.key`, `.pdf`, and `.png` files up to 50MB.
+4. **Audit History:** Per-asset timeline tracking who updated the record or unmasked secrets.
+5. **Renewal Log:** Expiration tracking, payment history, and renewal cost records.
 
-### ۳.۳. بخش مستندات اشتراکی نوع دارایی (Category Wiki Tab)
-علاوه بر مستندات هر رکورد، در بالای هر دسته دارایی (مثلاً در صفحه سرورهای VPS)، یک تب بزرگ به نام **«راهنمای جامع این دسته»** وجود دارد. مدیر فنی می‌تواند در این بخش مستندات کلی (مثلاً اصول هاردنینگ سرورها، نحوه ایمیج‌گیری یا قوانین نام‌گذاری) را بنویسد تا برای کل تیم به صورت مرجع در دسترس باشد.
+### 3.3. Category Wiki Tab
+In addition to individual asset notes, every category includes a shared **"Category Wiki"** tab. Technical leads can document global server hardening standards, naming conventions, or VPN procedures accessible by the entire team.
 
-### ۳.۴. کلیدهای میانبر کاربری (Keyboard Shortcuts)
-- `Ctrl + K` یا `Cmd + K`: باز شدن پنجره جستجوی سراسری پرسرعت از هر جای برنامه.
-- `Esc`: بستن کشوی جزئیات، مودال‌ها یا نتایج جستجو.
-- `Alt + N`: باز شدن سریع فرم ثبت دارایی جدید در دسته فعلی.
+### 3.4. Global Keyboard Shortcuts
+- `Ctrl + K` / `Cmd + K`: Open the global search and command palette.
+- `Esc`: Close drawers, modals, or active search overlays.
+- `Alt + N`: Quick-open the asset creation modal for the active category.

@@ -1,153 +1,154 @@
-# 🏛️ سند ۰۱: معماری کلان و استک فنی (Architecture & Tech Stack)
+# 🏛️ Document 01: System Architecture & Technology Stack
 
 ---
 
-## ۱. نمای کلی معماری سیستم (System Overview)
+## 1. System Architecture Overview
 
-سامانه «دفتر» به صورت یک نرم‌افزار تحت وب مستقل (Self-contained Web Application) در بستر شبکه محلی (LAN) سازمان مستقر می‌شود. معماری نرم‌افزار بر پایه تفکیک کامل کلاینت و سرور (Client-Server Decoupled Architecture) همراه با یک پروکسی معکوس (Reverse Proxy) برای مدیریت ترافیک امن HTTPS طراحی شده است.
+**Daftar** is deployed as an on-premise, self-contained web platform within the organization's local area network (LAN) or private cloud. The architecture is built on a clean **Client-Server Decoupled Architecture** paired with a reverse proxy to handle secure HTTPS and WebSocket traffic.
 
 ```mermaid
 graph TD
-    UserBrowser["مرورگر کاربر (کلاینت LAN)"] -->|HTTPS / WSS / پورت 443| ReverseProxy["وب‌سرور معکوس (Caddy / Nginx)"]
+    UserBrowser["User Browser (LAN Client)"] -->|HTTPS / WSS / Port 443| ReverseProxy["Reverse Proxy (Caddy / Nginx)"]
     
-    subgraph HostServer["سرور محلی شرکت (Docker Compose)"]
-        ReverseProxy -->|استاتیک فایل‌ها و روتینگ| WebClient["فرانت‌اند React (SPA)"]
-        ReverseProxy -->|درخواست‌های API / پورت 3000| BackendAPI["بک‌اند Node.js (Fastify API)"]
+    subgraph HostServer["Enterprise Host Server (Docker Compose)"]
+        ReverseProxy -->|Static Assets & Client Routing| WebClient["React Frontend (SPA)"]
+        ReverseProxy -->|API Proxying / Port 3000| BackendAPI["Node.js Fastify API"]
         
-        BackendAPI -->|کوئری‌های SQL & JSONB| PostgresDB[("پایگاه‌داده PostgreSQL 16")]
-        BackendAPI -->|فایل‌های آپلود شده| VolumeStorage["دیسک محلی ذخیره‌سازی فایل‌ها"]
-        BackendAPI -->|کلید اصلی متقارن| MasterKeySecret["Master Encryption Key (.env)"]
+        BackendAPI -->|SQL Queries & JSONB Operations| PostgresDB[("PostgreSQL 16 Database")]
+        BackendAPI -->|Encrypted Attachments| VolumeStorage["Local Attachment Storage Volume"]
+        BackendAPI -->|Master Cryptographic Key| MasterKeySecret["Master Encryption Key (.env)"]
     end
 ```
 
 ---
 
-## ۲. توجیه فنی انتخاب استک (Technology Stack Rationale)
+## 2. Technology Stack Rationale
 
-### ۲.۱. فرانت‌اند (Frontend)
-- **فریم‌ورک و ابزار بیلد:** `React 18+` با `Vite` و `TypeScript`.
-  * **دلیل انتخاب:** سرعت بیلد فوق‌العاده بالا، بهینگی حجم فایل‌ها در شبکه محلی، پایداری طولانی‌مدت اکوسیستم و تایپ‌سیفتی کامل.
-- **استایل‌دهی و طراحی:** `Tailwind CSS v3+` به همراه پلاگین `tailwindcss-rtl`.
-  * **دلیل انتخاب:** توسعه سریع رابط کاربری فارسی و راست‌چین با پشتیبانی از تم‌های تیره/روشن (Dark/Light Mode) و امکان ایجاد کامپوننت‌های مدرن شبیه به ابزارهای نسل جدید نظیر Linear و Notion.
-- **فونت و تایپوگرافی:** فونت استاندارد و زیبای **«وزیرمتن» (Vazirmatn)** به همراه اعداد فارسی برای نمایش استاندارد داده‌ها و ارقام مالی/آی‌پی.
-- **مدیریت جداول پویا:** `@tanstack/react-table v8`.
-  * **دلیل انتخاب:** سبک، فوق‌العاده قدرتمند، بدون وابستگی تحمیلی به UI، با قابلیت‌های داخلی بی‌نظیر برای مدیریت ستون‌های متغیر، پین کردن ستون‌ها، فیلتر و سورت مجازی (Virtualization) برای رکوردهای حجیم.
-- **گاه‌شمار و ویجت تاریخ:** `jalali-moment` و دیت‌پیکر اختصاصی شمسی برای مدیریت سررسیدها.
-- **رندرینگ مارک‌داون:** `react-markdown` + `remark-gfm` + `rehype-highlight` جهت رندر ایمن و غنی کدهای کانفیگ و اسکریپت‌ها.
+### 2.1. Frontend
+- **Framework & Build System:** `React 18+` with `Vite` and `TypeScript`.
+  * **Rationale:** Blazing fast hot module replacement (HMR), minimal bundle footprint across local networks, battle-tested ecosystem stability, and complete end-to-end type safety.
+- **Styling & Design System:** `Tailwind CSS v3+` with `tailwindcss-rtl`.
+  * **Rationale:** Rapid UI prototyping with native Right-To-Left (RTL) support alongside LTR monospace technical tokens, dark/light theme switching, and sleek visual aesthetics inspired by modern productivity tools like Linear and Notion.
+- **Typography:** **Vazirmatn** for clean Persian typography, paired with **JetBrains Mono** for technical data (IP addresses, ports, hashes, credentials).
+- **Advanced Data Grid:** `@tanstack/react-table v8`.
+  * **Rationale:** Headless, highly performant, with robust out-of-the-box support for dynamic columns, column pinning, sorting, filtering, and row virtualization for large asset inventories.
+- **Date & Calendar Widgets:** `jalali-moment` and custom Jalali/Gregorian datepickers for renewal and expiration tracking.
+- **Markdown Engine:** `react-markdown` + `remark-gfm` + `rehype-highlight` for rendering sanitized technical procedures, configuration scripts, and operational runbooks.
 
-### ۲.۲. بک‌اند (Backend)
-- **محیط اجرا و فریم‌ورک:** `Node.js 20 LTS` با `Fastify` و `TypeScript`.
-  * **دلیل انتخاب Fastify نسبت به Express:** سرعت تا ۲ برابر بیشتر، پشتیبانی توکار از اعتبارسنجی اسکیما با JSON Schema (Ajv)، معماری پلاگین‌محور بسیار تمیز و مدیریت استریم کارآمد در دانلود/آپلود فایل‌های حجیم.
-- **لایه دسترسی به پایگاه‌داده (ORM/Query Builder):** `Prisma ORM`.
-  * **دلیل انتخاب:** تولید تایپ‌های خودکار برای مدل‌ها، مهاجرت‌های امن (Migrations)، پشتیبانی عالی از عملیات‌های بومی ستون‌های `JSONB` در PostgreSQL.
-- **رمزنگاری:** ماژول نیتیو `node:crypto` با استاندارد صنعتی `AES-256-GCM`.
+### 2.2. Backend
+- **Runtime & Framework:** `Node.js 20 LTS` with `Fastify` and `TypeScript`.
+  * **Fastify vs. Express:** Up to 2x higher throughput, native JSON Schema validation via Ajv, clean plugin-based lifecycle encapsulation, and low-overhead streaming for file downloads and uploads.
+- **Database Access Layer (ORM):** `Prisma ORM`.
+  * **Rationale:** Strict type generation, safe migrations, and seamless support for PostgreSQL `JSONB` native operators.
+- **Cryptography:** Native `node:crypto` standard utilizing industry-grade `AES-256-GCM` with authenticated encryption tags.
 
-### ۲.۳. پایگاه داده (Database)
-- **پایگاه داده اصلی:** `PostgreSQL 16`.
-  * **دلیل انتخاب:** پایداری بی‌رقیب، پشتیبانی استثنایی از داده‌های ساختارنیافته از طریق `JSONB` و ایندکس‌های قدرتمند `GIN` (Generalized Inverted Index) که امکان جستجوی پرسرعت در میان فیلدهای متغیر داینامیک را فراهم می‌سازد، بدون نیاز به نصب موتورهای سنگینی مثل Elasticsearch.
+### 2.3. Database
+- **Primary Database:** `PostgreSQL 16`.
+  * **Rationale:** Enterprise durability, ACID compliance, and first-class unstructured data storage via `JSONB` paired with Generalized Inverted Indexes (`GIN`). This enables real-time search across dynamic, custom asset schemas without the resource overhead of dedicated search engines like Elasticsearch.
 
-### ۲.۴. پروکسی معکوس و امنیت شبکه محلی
-- **وب‌سرور:** `Caddy v2`.
-  * **دلیل انتخاب:** تولید خودکار و مدیریت گواهی‌های TLS/SSL خودامضا داخلی (Internal Self-Signed)، کانفیگ بسیار ساده در حد چند خط (Caddyfile)، بدون نیاز به دانش پیچیده Nginx یا Cron job تمدید سرتیفیکیت.
-  * **ضرورت HTTPS:** مرورگرهای وب مدرن (کروم و فایرفاکس) قابلیت کپی به کلیپ‌بورد (`navigator.clipboard.writeText`) را در اتصالات غیرامن HTTP بر روی آدرس‌های آی‌پی LAN مسدود می‌کنند. فعال بودن HTTPS پیش‌نیاز حیاتی ویژگی «کپی با یک کلیک» است.
+### 2.4. Reverse Proxy & Network Security
+- **Reverse Proxy:** `Caddy v2`.
+  * **Rationale:** Automatic internal self-signed TLS generation and renewal (`tls internal`), zero-friction configuration (`Caddyfile`), and low memory footprint.
+  * **HTTPS Requirement:** Modern web browsers (Chrome, Firefox, Safari) restrict the Clipboard API (`navigator.clipboard.writeText`) exclusively to **Secure Contexts** (HTTPS or localhost). Deploying behind Caddy ensures 1-click credential copying works smoothly across LAN IP addresses.
 
 ---
 
-## ۳. ساختار پوشه‌بندی پروژه (Repository Directory Structure)
+## 3. Repository Directory Structure
 
-پروژه با ساختار ماژولار Monorepo سبک (با استفاده از `pnpm workspaces` یا تفکیک تمیز در یک مخزن) سامان‌دهی می‌شود:
+The repository is organized as a lightweight, clean monorepo:
 
 ```plaintext
 daftar/
-├── .github/                      # اسکریپت‌های CI/CD احتمالی
-├── docs/                         # مستندات جامع فنی معماری
+├── .github/                      # CI/CD workflows and actions
+├── docs/                         # Technical architecture and design specifications
 │   ├── 01-architecture-and-stack.md
 │   ├── 02-data-model-and-schema.md
 │   ├── 03-security-and-encryption.md
 │   ├── 04-ui-ux-and-components.md
 │   ├── 05-core-features-spec.md
 │   └── 06-deployment-and-operations.md
-├── docker/                       # فایل‌های کانفیگ استقرار کانتینری
-│   ├── Caddyfile                 # تنظیمات وب‌سرور و SSL خودامضا
-│   ├── Dockerfile.client         # بیلد فرانت‌اند
-│   ├── Dockerfile.server         # بیلد بک‌اند Fastify
-│   └── backup.sh                 # اسکریپت بکاپ‌گیری دوره‌ای دیتابیس
-├── docker-compose.yml            # استقرار تک‌دستوری کل سرویس‌ها
-├── .env.example                  # نمونه متغیرهای محیطی سیستم
-├── README.md                     # راهنمای اصلی مخزن
+├── docker/                       # Container configuration files
+│   ├── Caddyfile                 # Reverse proxy & internal TLS configuration
+│   ├── Dockerfile.client         # Frontend production build container
+│   ├── Dockerfile.server         # Fastify API server container
+│   └── backup.sh                 # Automated periodic database backup worker
+├── docker-compose.yml            # Single-command full-stack container orchestration
+├── .env.example                  # Environment configuration template
+├── README.md                     # Project overview and quick start guide
 │
-├── client/                       # برنامه سمت کاربر (React + Vite SPA)
-│   ├── public/                   # فونت‌ها و فایل‌های استاتیک
+├── client/                       # Frontend application (React + Vite SPA)
+│   ├── public/                   # Fonts, icons, and static assets
 │   ├── src/
-│   │   ├── assets/               # آیکون‌ها و لوگوی دفتر
-│   │   ├── components/           # کامپوننت‌های عمومی (دکمه، مدال، لایه‌بندی)
-│   │   │   ├── common/           # فرم‌ها، تولتیپ‌ها، ورودی‌ها
-│   │   │   ├── grid/             # جدول داده اکسل‌گونه و ستون‌های داینامیک
-│   │   │   ├── docs/             # کامپوننت‌های رندر و ادیتور Markdown
-│   │   │   ├── reminders/        # ابزارک‌ها و لیست هشدارهای سررسید
-│   │   │   └── audit/            # نمایشگر لاگ و Diff تغییرات
-│   │   ├── hooks/                # هوک‌های سفارشی (useClipboard, useAuth, ...)
-│   │   ├── layouts/              # چیدمان اصلی و سایدبار دسته‌بندی‌ها
-│   │   ├── pages/                # صفحات (داشبورد، دارایی‌ها، تنظیمات، ...)
-│   │   ├── services/             # فراخوانی توابع API و اینترسپتورها
-│   │   ├── store/                # مدیریت استیت کلاینت (Zustand)
-│   │   ├── types/                # تعاریف تایپ‌های مشترک
-│   │   └── utils/                # توابع کمکی (فرمت تاریخ شمسی، کپی، ...)
+│   │   ├── assets/               # Brand assets and SVG illustrations
+│   │   ├── components/           # Reusable UI component library
+│   │   │   ├── common/           # Form inputs, tooltips, modals, buttons
+│   │   │   ├── grid/             # Excel-like data grid and dynamic column renderers
+│   │   │   ├── docs/             # Markdown viewers and runbook editors
+│   │   │   ├── reminders/        # Expiration badges and renewal widgets
+│   │   │   └── audit/            # Audit log timelines and diff viewers
+│   │   ├── hooks/                # Custom React hooks (useClipboard, useAuth, etc.)
+│   │   ├── layouts/              # Main layout shell and category navigation sidebar
+│   │   ├── pages/                # Route views (Dashboard, Assets, Settings, Audit)
+│   │   ├── services/             # API client, HTTP interceptors, and endpoints
+│   │   ├── store/                # Client state management (Zustand)
+│   │   ├── types/                # Shared TypeScript type definitions
+│   │   └── utils/                # Date formatting, clipboard helpers, sanitizers
 │   ├── index.html
 │   ├── package.json
 │   ├── tailwind.config.js
 │   └── vite.config.ts
 │
-└── server/                       # برنامه سمت سرور (Node.js + Fastify)
+└── server/                       # Backend application (Node.js + Fastify)
     ├── prisma/
-    │   ├── schema.prisma         # تعریف مدل‌های دیتابیس
-    │   └── migrations/           # تاریخچه مهاجرت‌های پایگاه داده
+    │   ├── schema.prisma         # Database schema definitions
+    │   └── migrations/           # Versioned database migrations
     ├── src/
-    │   ├── config/               # خواندن متغیرهای محیطی و کلید مستر
-    │   ├── controllers/          # کنترلرهای مسیرهای API
-    │   ├── middlewares/          # احراز هویت، اعتبارسنجی، لاگ‌گیری
-    │   ├── plugins/              # پلاگین‌های Fastify (CORS, Multipart, ...)
-    │   ├── routes/               # تعریف Endpointهای REST
-    │   ├── services/             # لایه منطق بیزینس و محاسبات
-    │   │   ├── crypto.service.ts # توابع رمزنگاری و رمزگشایی متقارن
-    │   │   ├── audit.service.ts  # موتور ثبت لاگ و تفاوت مقادیر
-    │   │   ├── reminder.service.ts # زمان‌بندی و پایش سررسیدها
-    │   │   ├── excel.service.ts  # پردازش فایل‌های ورود و خروج داده
-    │   │   └── storage.service.ts# مدیریت آپلود و دانلود فایل‌ها
-    │   ├── types/                # تایپ‌های ورودی و خروجی DTO
-    │   └── app.ts                # نقطه ورود و راه‌اندازی سرور
+    │   ├── config/               # Environment variables and cryptographic secrets
+    │   ├── controllers/          # API route request handlers
+    │   ├── middlewares/          # Authentication, validation, and rate-limiting
+    │   ├── plugins/              # Fastify plugins (CORS, Multipart, Rate-limit, Helmet)
+    │   ├── routes/               # REST API endpoints definition
+    │   ├── services/             # Domain logic and business services
+    │   │   ├── crypto.service.ts # Symmetric encryption and decryption helpers
+    │   │   ├── audit.service.ts  # Audit trail and diff logging engine
+    │   │   ├── reminder.service.ts # Expiration schedule monitoring & alerts
+    │   │   ├── notification.service.ts # Multi-channel webhook/bot alert dispatcher
+    │   │   ├── excel.service.ts  # Excel/CSV import and export pipelines
+    │   │   └── storage.service.ts# Attachment storage and download streaming
+    │   ├── types/                # DTO and request/response type definitions
+    │   └── app.ts                # Fastify server entry point and bootstrap
     ├── package.json
     └── tsconfig.json
 ```
 
 ---
 
-## ۴. چرخه حیات درخواست‌ها و جریان داده (Data Flow Lifecycle)
+## 4. Request Lifecycle & Data Flow
 
-### ۴.۱. ثبت یک دارایی جدید با فیلد پسورد
-1. کاربر در فرم داینامیک، مشخصات سرور (IP، نام، کاربر، پسورد) را وارد می‌کند.
-2. فرانت‌اند درخواست `POST /api/assets` را ارسال می‌نماید.
-3. در بک‌اند:
-   * مقادیر اعتبارسنجی می‌شوند (فیلدهای اجباری بررسی می‌گردند).
-   * فیلدهای با نوع `password` یا `secret` از بقیه مقادیر جدا می‌شوند.
-   * ماژول `crypto.service.ts` با کلید ۳۲ بایتی `MASTER_ENCRYPTION_KEY` و یک بردار اولیه (IV) تصادفی ۱۲ بایتی، مقدار را با الگوریتم `aes-256-gcm` رمزنگاری می‌کند.
-   * رکورد در PostgreSQL ذخیره می‌شود: فیلدهای عادی در ستون `values (JSONB)` و فیلدهای قفل‌شده در ستون `encrypted_values (JSONB)`.
-   * یک ردیف در جدول `audit_logs` با عنوان `ACTION_CREATE_ASSET` درج می‌گردد.
+### 4.1. Creating a New Asset with Encrypted Secrets
+1. The user inputs asset details (e.g., Hostname, IP address, root username, SSH password) into the dynamic asset form.
+2. The frontend submits a `POST /api/assets` request with the payload.
+3. Backend processing:
+   * The payload is validated against the category's `schemaDefinition`.
+   * Fields defined as `secret` or `password` are separated from standard fields.
+   * `crypto.service.ts` uses the 32-byte `MASTER_ENCRYPTION_KEY` and a cryptographically random 12-byte initialization vector (IV) to encrypt each secret using `AES-256-GCM`.
+   * The asset record is committed to PostgreSQL: standard values are stored in `values (JSONB)`, and encrypted objects (containing IV, Auth Tag, and Ciphertext) are stored in `encrypted_values (JSONB)`.
+   * An immutable audit log entry is inserted into `AuditLog` (`ACTION_CREATE_ASSET`).
 
-### ۴.۲. مشاهده یا کپی رمز عبور توسط کاربر مجاز
-1. در جدول، فیلد پسورد به شکل ماسک‌شده `••••••••` نمایش داده می‌شود.
-2. کاربر مجاز روی آیکون «نمایش» یا «کپی» کلیک می‌کند.
-3. یک درخواست امنیتی `POST /api/assets/:id/reveal-secret` شامل فیلد درخواستی ارسال می‌شود.
-4. سرور سطح دسترسی کاربر و نقش او را بررسی می‌کند.
-5. در صورت تایید دسترسی:
-   * فیلد در حافظه سرور رمزگشایی (Decrypt) می‌شود.
-   * هم‌زمان در جدول `audit_logs` ثبت می‌شود: *"کاربر X در زمان Y رمز فیلد Z از دارایی W را کپی/مشاهده کرد"*.
-   * مقدار رمزگشایی‌شده به کلاینت بازگردانده شده و مستقیماً روی کلیپ‌بورد کپی می‌شود.
+### 4.2. Viewing or Copying a Secret by an Authorized User
+1. In the asset grid, sensitive fields are masked by default (`••••••••`).
+2. An authorized user clicks the **Reveal** (👁️) or **Copy** (📋) button.
+3. A security request `POST /api/assets/:id/reveal-secret` is dispatched specifying the target secret field.
+4. The server validates the user's session, role, and category-level permissions.
+5. Upon authorization:
+   * The secret is decrypted in memory.
+   * An audit entry is recorded: *"User X copied/revealed secret field Z for Asset W"*, including the timestamp and client IP address.
+   * The decrypted plaintext is returned to the client and written directly to the system clipboard or unmasked temporarily with a 30-second security auto-hide countdown.
 
 ---
 
-## ۵. استراتژی مدیریت خطا و تاب‌آوری (Resilience & Error Handling)
+## 5. Resilience & Operational Guidelines
 
-1. **خطای عدم دسترسی به شبکه خارجی (Offline-First):** سرور کاملاً به صورت مستقل (Self-contained) در شبکه داخلی بدون نیاز به اینترنت برای رندر فونت‌ها یا کتابخانه‌ها کار می‌کند (فونت وزیرمتن و تمامی فایل‌ها به صورت باندل لوکال بسته‌بندی می‌شوند).
-2. **پشتیبان‌گیری خودکار (Daily Automated Backups):** کانتینر اختصاصی داکر به صورت کرون‌جاب شبانه از دیتابیس Postgres با فرمت فشرده `.dump` خروجی می‌گیرد و در دیسک ذخیره می‌کند.
-3. **محدودیت حجم و زمان (Rate Limiting & File Size Limit):** فیلتر کردن درخواست‌ها برای جلوگیری از اشباع سرور در شبکه محلی و تعیین سقف ۵۰ مگابایت برای فایل‌های پیوست.
+1. **Air-Gapped & Offline Compatibility:** Daftar is 100% self-contained. No external CDN or internet connection is required at runtime; all web fonts, icons, and client bundles are compiled locally.
+2. **Automated Daily Backups:** An isolated Docker container runs an automated daily cron job producing compressed `.sql.gz` PostgreSQL dumps with a rolling 30-day retention window.
+3. **Defense in Depth & Rate Limiting:** Global rate limiting (100 req/min for general routes, 10 req/min for authentication endpoints), OWASP security headers via `@fastify/helmet`, and a 50MB file size ceiling for attachments protect against abuse and resource exhaustion.

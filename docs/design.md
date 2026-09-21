@@ -1,209 +1,189 @@
-# 🎨 سند نهایی و جامع طراحی رابط کاربری و تجربه کاربری (UI/UX Design Master Specification)
-> **پروژه:** «دفتر» (Daftar) — سامانه متمرکز مدیریت دارایی‌های دیجیتال، دسترسی‌ها و مستندات سازمانی  
-> **وضعیت:** نسخه نهایی بازبینی‌شده (تکمیل‌شده بر اساس دو مرحله ارزیابی انتقادی ارگونومی و امنیت)  
-> **زبان و جهت:** فارسی (RTL First) با تایپوگرافی فنی LTR Monospace برای داده‌های سیستمی
+# 🎨 UI/UX Design Master Specification
+> **Project:** Daftar — Enterprise IT Asset Vault, Secrets Manager & Operational Runbooks  
+> **Status:** Final Reviewed Specification (Refined based on ergonomic and security evaluations)  
+> **Language & Layout:** Bi-directional Support (RTL/LTR) with LTR Monospace Typography for Technical Data
 
 ---
 
-## ۱. فلسفه طراحی و متدولوژی (Design Philosophy & Core Axioms)
+## 1. Design Philosophy & Core Axioms
 
-رابط کاربری «دفتر» بر پایه ۳ ستون اصلی طراحی شده است:
+The user interface of **Daftar** is built upon three foundational pillars:
 
-1. **تراکم بدون آشفتگی (Density without Clutter):** الهام‌گرفته از سرعت و کارایی اکسل همراه با مینیمالیسم ابزارهای مدرنی چون Linear و Notion. کاربران سازمانی نیازمند مشاهده حداکثر داده در یک نگاه بدون پیمایش‌های بی‌مورد هستند.
-2. **ارگونومی «۲ کلیک تا دسترسی» (The 2-Click Rule):** در لحظات اضطراری و قطعی سرویس، هر داده فنی (آدرس آی‌پی، نام کاربری، پورت یا رمز عبور) باید در کمتر از ۳ ثانیه و حداکثر با ۲ کلیک پیدا و کپی شود.
-3. **امنیت نامحسوس ولی نفوذناپذیر (Zero-Friction Security):** مکانیزم‌های حفاظتی (ماسک کردن رمزها، زمان‌سنج پنهان‌سازی خودکار و ثبت لاگ) هرگز نباید مانع سرعت کار روزمره متخصصین فنی شوند.
+1. **Density without Clutter:** Inspired by the raw information density of Excel combined with the clean minimalism of modern tools like Linear and Notion. Enterprise operations require seeing maximal operational data at a glance without unnecessary pagination or excessive white space.
+2. **The 2-Click Rule:** During outages and high-pressure incident response, any critical technical attribute (IP address, root username, SSH port, or password) must be discoverable and copied in under 3 seconds with at most 2 clicks.
+3. **Zero-Friction Security:** Security safeguards (credential masking, automatic concealment timers, and audit logging) must never hinder the daily velocity of DevOps and systems engineers.
 
 ---
 
-## ۲. سیستم طراحی و توکن‌های بصری (Design System Tokens)
+## 2. Design System & Visual Tokens
 
-### ۲.۱. پالت رنگی با کنتراست استاندارد WCAG AAA
-سیستم به صورت پیش‌فرض با **تم تیره ملایم سازمانی (Deep Slate Dark)** رندر می‌شود که خستگی چشم را در شیفت‌های طولانی کاهش می‌دهد و قابلیت سوئیچ آنی به تم روشن را دارد:
+### 2.1. Color Palette with WCAG AAA Contrast
+The application defaults to an ergonomic **Deep Slate Dark** theme designed to minimize eye fatigue during extended on-call shifts, with instantaneous toggle capability to Light mode:
 
 ```css
-/* پالت رنگی تم تیره (Dark Mode Tokens) */
---bg-canvas: #0B0F19;         /* پس‌زمینه اصلی نرم‌افزار */
---bg-surface-1: #111827;      /* پس‌زمینه کارت‌ها، سایدبار و جداول */
---bg-surface-2: #1F2937;      /* پس‌زمینه در هنگام Hover یا سطوح برجسته */
---bg-surface-elevated: #374151; /* پس‌زمینه منوها، پاپ‌اورها و مودال‌ها */
---border-subtle: #1F2937;     /* خطوط جداکننده ملایم */
---border-strong: #374151;     /* حاشیه اینپوت‌ها و جداول */
+/* Dark Mode Tokens */
+--bg-canvas: #0B0F19;         /* Main application canvas */
+--bg-surface-1: #111827;      /* Cards, sidebar, and table container surfaces */
+--bg-surface-2: #1F2937;      /* Hover states and elevated cards */
+--bg-surface-elevated: #374151; /* Dropdowns, popovers, and modal dialogs */
+--border-subtle: #1F2937;     /* Soft separators */
+--border-strong: #374151;     /* Input fields and table borders */
 
-/* رنگ‌های برند و تعامل */
---primary-500: #6366F1;       /* دکمه‌های اصلی و حالت فوکوس (Indigo) */
---primary-600: #4F46E5;       /* حالت Hover دکمه‌ها */
---primary-glow: rgba(99, 102, 241, 0.15); /* درخشش فوکوس */
+/* Brand & Interactive Colors */
+--primary-500: #6366F1;       /* Primary action buttons & focus rings (Indigo) */
+--primary-600: #4F46E5;       /* Hover state on primary actions */
+--primary-glow: rgba(99, 102, 241, 0.15); /* Focus aura */
 
-/* وضعیت‌های سررسید و اخطار (Status Badges) */
---status-critical: #EF4444;   /* قرمز: منقضی شده یا نقض امنیتی */
---status-warning-high: #F59E0B;/* نارنجی: سررسید کمتر از ۷ روز */
---status-warning-mid: #EAB308; /* زرد: سررسید کمتر از ۳۰ روز */
---status-success: #10B981;    /* زمردی: پایدار، معتبر، کپی موفق */
+/* Status & Expiry Badges */
+--status-critical: #EF4444;   /* Red: Expired or security alert */
+--status-warning-high: #F59E0B;/* Orange: Expiry due within 7 days */
+--status-warning-mid: #EAB308; /* Yellow: Expiry due within 30 days */
+--status-success: #10B981;    /* Emerald: Active, healthy, copied successfully */
 ```
 
-### ۲.۲. استانداردهای تایپوگرافی و جهت‌گیری (Typography & Bidirectional Rules)
-* **قلم اصلی فارسی:** خانواده فونت **«وزیرمتن» (Vazirmatn)** با وزن‌های ۳۰۰ (Light)، ۴۰۰ (Regular)، ۵۰۰ (Medium) و ۷۰۰ (Bold).
-* **قلم داده‌های فنی:** فونت **`JetBrains Mono`** برای کلیه آدرس‌های IP، پورت‌ها، پسوردها، مسیرهای فایل و مقادیر هش با مشخصات زیر:
-  * جهت اجباری چپ‌به‌راست (`dir="ltr"`).
-  * اعداد جدول با عرض ثابت (`font-variant-numeric: tabular-nums`) برای تراز دقیق ارقام در ستون‌های زیر هم.
-  * جلوگیری از به هم ریختگی ترتیب پرانتزها و دونقطه‌ها در آی‌پی و پورت (مثلاً `192.168.1.1:8080`).
+### 2.2. Typography & Bidirectional Rules
+* **UI Typography:** The **Vazirmatn** font family across 300 (Light), 400 (Regular), 500 (Medium), and 700 (Bold) weights for clear bilingual legibility.
+* **Technical Monospace Typography:** **`JetBrains Mono`** for all IP addresses, ports, credentials, file paths, and hashes:
+  * Strict Left-to-Right (`dir="ltr"`) rendering.
+  * Tabular numeric alignment (`font-variant-numeric: tabular-nums`) to ensure figures line up perfectly across vertical table rows.
+  * Prevention of punctuation and colon inversions in network addresses (e.g. `192.168.1.1:8080`).
 
 ---
 
-## ۳. معماری چیدمان و ساختار صفحات (Layout Architecture)
+## 3. Layout Architecture
 
-رابط کاربری به صورت یک چیدمان سه‌بخشی هماهنگ (Unified Workspace) طراحی شده است:
+The interface provides a synchronized, three-pane workspace:
 
 ```plaintext
 +---------------------------------------------------------------------------------------------------------+
-| [🗂️ دفتر]  [🔍 جستجوی سراسری... (Ctrl+K)]                   [⏰ ۳ سررسید نزدیک]  [☀️/🌙]  [👤 مدیر سیستم ▼] |
+| [🗂️ Daftar]  [🔍 Global Search... (Ctrl+K)]                  [⏰ 3 Expirations]  [☀️/🌙]  [👤 SysAdmin ▼] |
 +-----------------------+---------------------------------------------------------------------------------+
-|  سایدبار دسته‌ها       | مسیر: [دارایی‌ها] / [سرورهای مجازی (VPS)]                 تراکم: [ فشرده | عادی ]|
+|  Categories Sidebar   | Breadcrumb: [Assets] / [Virtual Servers (VPS)]          Density: [ Compact | Normal ]|
 |                       +---------------------------------------------------------------------------------+
-| ➕ ایجاد دسته جدید     | [➕ افزودن دارایی] [📖 راهنمای دسته] [⚙️ تنظیم فیلدها] [📥 ایمپورت] [📤 خروجی اکسل]|
+| ➕ New Category       | [➕ Add Asset] [📖 Category Wiki] [⚙️ Schema] [📥 Import] [📤 Export Excel]     |
 | --------------------- |---------------------------------------------------------------------------------|
-| 📁 زیرساخت و شبکه     | فیلتر سریع: [ همه (۲۴) ] [ 🔴 منقضی (۲) ] [ 🟠 سررسید نزدیک (۳) ] [ 🔍 فیلتر... ] |
-|  🖥️ سرورها (VPS) [۱۲] |---------------------------------------------------------------------------------|
-|  🌐 دامنه‌ها [۶]       | [ ] | نام دارایی       | آدرس IP / پورت   | سیستم‌عامل | پسورد Root      | سررسید   |
-|  🔑 لایسنس‌ها [۸]     |---------------------------------------------------------------------------------|
-| 📁 خدمات اینترنتی     | [ ] | سرور دیتابیس     | 10.0.1.5:5432 📋 | Ubuntu     | •••••••• 👁️ 📋  | ۱۴۰۵/۰۲/۱۵|
-|  ✉️ ایمیل‌های سازمانی  | [ ] | لودبالانسر تهران | 192.168.1.10  📋 | Debian     | •••••••• 👁️ 📋  | ۱۴۰۴/۱۲/۲۸|
-|                       | [ ] | سرور بکاپ آلمان  | 89.144.20.12  📋 | Rocky      | •••••••• 👁️ 📋  | ۷ روز دیگر|
+| 📁 Infrastructure     | Quick Filter: [ All (24) ] [ 🔴 Expired (2) ] [ 🟠 Upcoming (3) ] [ 🔍 Filter ] |
+|  🖥️ VPS Servers [12]  |---------------------------------------------------------------------------------|
+|  🌐 Domains [6]       | [ ] | Asset Name       | IP Address / Port| OS         | Root Password   | Expiry   |
+|  🔑 Licenses [8]      |---------------------------------------------------------------------------------|
+| 📁 SaaS & Subscriptions| [ ] | Primary Database | 10.0.1.5:5432 📋 | Ubuntu     | •••••••• 👁️ 📋  | 2026/05/15|
+|  ✉️ Corporate Mail    | [ ] | Tehran LB        | 192.168.1.10  📋 | Debian     | •••••••• 👁️ 📋  | 2026/03/20|
+|                       | [ ] | Germany Backup   | 89.144.20.12  📋 | Rocky      | •••••••• 👁️ 📋  | In 7 days|
 | --------------------- +---------------------------------------------------------------------------------+
-| ⏰ سامانه سررسیدها    | نمایش ۱ تا ۳ از ۲۴ دارایی | ستون‌های فعال: ۵ از ۸ ▼ | [◀ قبلی] [۱] ۲ ۳ [بعدی ▶] |
-| 📜 ممیزی و لاگ‌ها     +---------------------------------------------------------------------------------+
-| 👥 کاربران و دسترسی‌ها | کشوی جزئیات (با کلیک روی هر سطر از سمت چپ باز می‌شود):                          |
-| ⚙️ تنظیمات عمومی      | [مشخصات کامل] | [📖 مستندات و کانفیگ] | [📎 پیوست‌ها (۳)] | [🕒 تاریخچه لاگ]   |
+| ⏰ Expiry Center      | Showing 1 to 3 of 24 assets | Active Columns: 5 of 8 ▼ | [◀ Prev] [1] 2 3 [Next ▶] |
+| 📜 Audit Trail        +---------------------------------------------------------------------------------+
+| 👥 User Management    | Detail Drawer (Opens smoothly from screen edge on row click):                   |
+| ⚙️ Global Settings    | [Properties] | [📖 Runbook & Config] | [📎 Attachments (3)] | [🕒 Audit Log]     |
 +-----------------------+---------------------------------------------------------------------------------+
 ```
 
 ---
 
-## ۴. طراحی و ارگونومی جدول داده اکسل‌گونه (Advanced Data Grid UX)
+## 4. Advanced Data Grid UX
 
-جدول داده، مهم‌ترین بخش نرم‌افزار است و با در نظر گرفتن چالش‌های ارگونومیک زیر بازطراحی شده است:
+The data grid serves as the core operational canvas and incorporates the following ergonomic design choices:
 
-### ۴.۱. کنترل تراکم نمایش (Density Toggle)
-* **حالت فشرده (Compact Mode - پیش‌فرض مدیران فنی):**
-  * ارتفاع ردیف‌ها: `36px`.
-  * اندازه فونت: `12.5px`.
-  * امکان مشاهده تا ۲۵ ردیف بدون نیاز به اسکرول صفحه در نمایشگرهای استاندارد اداری.
-* **حالت راحت (Comfortable Mode):**
-  * ارتفاع ردیف‌ها: `48px`.
-  * اندازه فونت: `14px` با پدینگ بیشتر، مناسب بررسی‌های تحلیلی و تبلت‌ها.
+### 4.1. Density Toggle
+* **Compact Mode (Default for DevOps):**
+  * Row height: `36px`.
+  * Font size: `12.5px`.
+  * Displays up to 25 rows simultaneously without scrolling on 1080p monitors.
+* **Comfortable Mode:**
+  * Row height: `48px`.
+  * Font size: `14px` with relaxed padding, optimal for touchscreens and tablet audits.
 
-### ۴.۲. حل تعارض رویداد کلیک ردیف (Click Conflict Resolution)
-* **چالش شناسایی‌شده در بازبینی اول:** اگر کلیک روی سطر جدول باعث باز شدن کشوی جزئیات شود، کاربر هنگام کلیک روی دکمه کپی یا چشم پسورد دچار خطای کلیک و مزاحمت باز شدن پنل می‌شد.
-* **راه‌حل پیاده‌سازی شده:**
-  1. تمامی المان‌های تعاملی داخل سلول‌ها (دکمه‌های کپی، دکمه آشکارسازی، لینک‌های وب و چک‌باکس‌ها) دارای رویداد `e.stopPropagation()` هستند.
-  2. نشانگر ماوس (Cursor) روی فضای خالی سطر به شکل `pointer` و روی دکمه‌های کپی به شکل `copy` درمی‌آید.
-  3. یک ستون انتهایی ثابت با آیکون فلش اختصاصی (↗️) برای باز کردن مستقیم کشوی جزئیات قرار دارد.
+### 4.2. Click Conflict Resolution
+* All interactive cell elements (copy buttons, reveal eye toggles, hyperlinks, checkboxes) use `e.stopPropagation()` to prevent unwanted drawer triggers.
+* The cursor displays as `copy` over copy targets and `pointer` over general row surfaces.
+* A dedicated action column provides a clear link arrow (↗️) for opening the detail drawer.
 
-### ۴.۳. ستون‌های شناور و پین‌شده (Sticky Columns)
-* ستون چک‌باکس انتخاب چندتایی و ستون «نام دارایی» در سمت راست جدول پین می‌شوند و هنگام اسکرول افقی در میان فیلدهای متعدد، همواره خوانا باقی می‌مانند.
-* منوی کشویی «مدیریت ستون‌ها» به کاربر امکان می‌دهد با زدن تیک، ستون‌های کم‌کاربرد را پنهان کند؛ این تنظیمات در `localStorage` مرورگر کاربر ذخیره می‌شود.
+### 4.3. Sticky Columns & Visibility Management
+* Multi-select checkboxes and the Asset Name column remain pinned during horizontal scrolling across wide custom schemas.
+* Column visibility preferences persist automatically in client `localStorage`.
 
-### ۴.۴. نوار عملیات دسته‌ای (Bulk Actions Bar)
-با انتخاب یک یا چند چک‌باکس سطرها، نوار ابزار شناوری در پایین صفحه ظاهر می‌شود:
-* نمایش تعداد انتخاب‌شده (مثلاً: *"۵ مورد انتخاب شد"*).
-* دکمه خروجی اکسل از موارد انتخابی.
-* دکمه حذف دسته‌ای (با تاییدیه دوسطحی).
-* دکمه انتساب برچسب/دسته مشترک.
+### 4.4. Bulk Actions Floating Toolbar
+Selecting one or more rows summons a floating action bar at the screen bottom:
+* Selected count indicator (e.g. *"5 items selected"*).
+* Export selected items to Excel.
+* Batch delete with two-step confirmation.
+* Batch assign category or tags.
 
 ---
 
-## ۵. امنیت بصری و ارگونومی کپی داده‌ها (Clipboard & Visual Security)
+## 5. Visual Security & Clipboard Ergonomics
 
-### ۵.۱. چرخه حیات کپی با ۱-کلیک (Micro-Interaction)
-1. **حالت عادی:** آیکون کپی خاکستری کم‌رنگ در کنار مقادیر فنی قرار دارد (`opacity-40`).
-2. **حالت Hover:** آیکون پررنگ‌تر شده و یک تولتیپ کوچک فارسی *"کپی در کلیپ‌بورد"* ظاهر می‌شود.
-3. **لحظه کلیک:** 
-   * آیکون به سرعت تغییر فرم داده و به علامت تیک زمردی (✅) تبدیل می‌شود.
-   * تولتیپ به مدت ۱.۵ ثانیه به متن سبز *"کپی شد!"* تغییر می‌کند.
-   * هیچ صدای مزاحمی پخش نمی‌شود و صفحه جابه‌جا نمی‌گردد.
+### 5.1. 1-Click Copy Lifecycle (Micro-Interaction)
+1. **Idle State:** Soft muted copy icon beside technical values (`opacity-40`).
+2. **Hover State:** Highlighted icon with an instant tooltip *"Copy to clipboard"*.
+3. **Click State:** 
+   * Icon transitions to an emerald checkmark (✅).
+   * Tooltip updates to green *"Copied!"* for 1.5 seconds.
+   * Zero screen jitter or disruption.
 
-### ۵.۲. رفتار فیلدهای امنیتی و جلوگیری از سرقت چشمی (Shoulder Surfing Protection)
-* مقادیر پسورد همواره به شکل دایره‌های توپر `••••••••` رندر می‌شوند.
-* **کپی مستقیم بدون آشکارسازی:** کاربر می‌تواند مستقیماً روی دکمه کپی کنار پسورد کلیک کند. مقدار در حافظه رمزگشایی شده و به کلیپ‌بورد منتقل می‌شود، بدون اینکه حتی یک فریم از کاراکترهای پسورد روی مانیتور برای اطرافیان دیده شود!
-* **آشکارسازی مشروط با تایمر خودکار:**
-  * در صورت کلیک روی آیکون چشم (👁️)، پسورد بازگشایی می‌شود.
-  * یک نوار پیشرفت باریک قرمز رنگ در زیر فیلد فعال شده و شمارش معکوس **۳۰ ثانیه‌ای** آغاز می‌شود.
-  * پس از ۳۰ ثانیه (یا در صورت خروج فوکوس کاربر از صفحه / تغییر تب مرورگر)، پسورد به صورت خودکار دوباره ماسک می‌شود.
+### 5.2. Shoulder Surfing Protection
+* Passwords render by default as masked bullets `••••••••`.
+* **Direct Blind Copy:** Users can click the copy icon directly beside a masked password. The credential is decrypted in memory and copied to the clipboard without ever exposing plaintext characters on the monitor.
+* **Conditional Reveal with Auto-Mask Timer:**
+  * Clicking the eye icon (👁️) reveals the credential.
+  * A subtle countdown indicator begins a **30-second timer**.
+  * After 30 seconds (or immediately upon tab blur/window defocus), the field automatically reverts to masked bullets.
 
-### ۵.۳. مکانیزم Fallback برای کپی ناموفق
-چنانچه به هر دلیلی مرورگر کاربر دسترسی Clipboard API را مسدود کند:
-* سیستم فوراً یک پنجره پاپ‌آپ کوچک و ظریف با متن رمزگشایی‌شده که به صورت پیش‌فرض در حالت انتخاب (Select All) است باز می‌کند و پیام *"لطفاً کلیدهای Ctrl+C را فشار دهید"* را نمایش می‌دهد تا کار کاربر لنگ نماند.
-
----
-
-## ۶. پنل کشویی چندمنظوره (The Slide-over Detail Drawer)
-
-کشوی جزئیات از سمت چپ صفحه باز شده و به عنوان فضای کار متمرکز برای هر دارایی عمل می‌کند.
-
-### ساختار تب‌های کشو:
-1. **تب مشخصات (Properties):**
-   * فرم ویرایش تمام فیلدهای داینامیک با اعتبارسنجی در لحظه (Instant Inline Validation).
-   * امکان تولید خودکار پسورد تصادفی ایمن (Password Generator) شامل حروف کوچک، بزرگ، اعداد و کاراکترهای ویژه با تعیین طول.
-2. **تب مستندات و راهنما (Embedded Markdown):**
-   * به جای اسکرول‌های تودرتو، دارای سوییچ دوحالته:
-     * **حالت مشاهده (Preview):** رندرینگ غنی مارک‌داون شامل کدهای رنگی‌شده (Syntax Highlighting) با دکمه اختصاصی کپی کل قطعه‌کد (Code block copy button).
-     * **حالت نگارش (Edit):** ادیتور متنی تمیز با کلیدهای میانبر استاندارد مارک‌داون (`Ctrl+B` برای برجسته، `Ctrl+K` برای لینک).
-3. **تب پیوست‌ها (File Attachments):**
-   * باکس کشیدن و رها کردن فایل (Drag & Drop Zone).
-   * نمایش آیکون متناسب با پسوند فایل (PDF، فایل‌های کانفیگ، تصاویر، کلیدها).
-   * پیش‌نمایش مستقیم برای تصاویر و فایل‌های متنی بدون نیاز به دانلود.
-4. **تب تاریخچه تغییرات و ممیزی (Audit Timeline):**
-   * نمایش خط زمانی رویدادهای مربوط به این رکورد خاص (چه کسی چه تغییری داده یا چه زمانی رمز کپی شده است) با تفکیک بصری تغییرات به رنگ‌های سبز (افزوده شده) و قرمز (حذف شده).
-5. **تب سوابق تمدید و فاکتورها (Renewals):**
-   * تاریخچه تمام تمدیدهای پیشین، هزینه‌های پرداخت‌شده و فاکتورهای پیوست.
+### 5.3. Graceful Clipboard Fallback
+If the browser restricts clipboard write permissions:
+* A modal immediately appears with the decrypted secret pre-selected, prompting *"Press Ctrl+C to copy"*.
 
 ---
 
-## ۷. پنجره فرمان و جستجوی فوق‌سریع سراسری (Command Palette / Global Search)
+## 6. Slide-Over Detail Drawer
 
-با فشردن `Ctrl + K` یا `Cmd + K`، یک پالت دستوری مدرن در مرکز صفحه ظاهر می‌شود:
+Clicking a row opens the slide-over drawer containing:
+1. **Properties:** Comprehensive form for updating dynamic and encrypted attributes with inline validation and an integrated secure password generator.
+2. **Runbook & Documentation (Embedded Markdown):**
+   * **Preview Mode:** Markdown rendering with syntax highlighting and 1-click code block copying.
+   * **Edit Mode:** Distraction-free markdown editor with standard keyboard shortcuts (`Ctrl+B`, `Ctrl+K`).
+3. **Attachments:** Drag-and-drop zone supporting config files, VPN profiles, and certificates up to 50MB.
+4. **Audit Timeline:** Historical chronological log of changes and secret unmask events for the asset.
+5. **Renewal Records:** Past renewal expenses, invoices, and payment receipts.
+
+---
+
+## 7. Command Palette & Global Search (`Ctrl + K`)
+
+Pressing `Ctrl + K` or `Cmd + K` opens the centralized command palette:
 
 ```plaintext
 +-----------------------------------------------------------------------------+
-|  🔍 سرور اصلی...                                              [ Esc برای خروج ]|
+|  🔍 Main server...                                            [ Esc to exit ]|
 +-----------------------------------------------------------------------------+
-| نتایج یافت شده در دارایی‌ها:                                                |
-|  🖥️ [VPS] سرور اصلی دیتاسنتر تهران                        192.168.10.15 📋  |
-|      ↳ سیستم عامل: Ubuntu 24.04  | سررسید: ۱۴۰۵/۰۲/۱۵                       |
-|  🖥️ [VPS] سرور اصلی احراز هویت                            10.0.1.20     📋  |
+| Matching Assets:                                                            |
+|  🖥️ [VPS] Tehran Datacenter Main DB                        192.168.10.15 📋  |
+|      ↳ OS: Ubuntu 24.04  | Renewal: 2026/05/15                              |
+|  🖥️ [VPS] Auth Gateway Node                                10.0.1.20     📋  |
 |                                                                             |
-| نتایج یافت شده در مستندات و راهنماها:                                        |
-|  📖 راهنمای تنظیم فایروال سرور اصلی تهران                                   |
-|      ↳ "...برای باز کردن پورت 5432 از دستور ufw allow استفاده کنید..."     |
+| Matching Documentation & Runbooks:                                          |
+|  📖 Tehran Server Firewall Setup Runbook                                    |
+|      ↳ "...allow incoming port 5432 using ufw allow command..."             |
 |                                                                             |
-| دستورات سریع سیستمی:                                                        |
-|  ➕ افزودن سرور جدید در دسته VPS                                             |
-|  ⏰ مشاهده سررسیدهای این هفته (۳ مورد)                                       |
+| Quick Commands:                                                             |
+|  ➕ Add new server in VPS category                                           |
+|  ⏰ View this week's renewals (3 items)                                      |
 +-----------------------------------------------------------------------------+
-| ⇅ جهت حرکت بین نتایج  |  ↵ برای باز کردن کشوی جزئیات  |  Tab کپی سریع آدرس IP |
+| ⇅ Navigate  |  ↵ Open Detail Drawer  |  Tab Copy IP Address                 |
 +-----------------------------------------------------------------------------+
 ```
 
 ---
 
-## ۸. سیستم تقویم و هشدارهای سررسید (Jalali Expiry & Reminders UX)
+## 8. Expiration Radar & Calendar UX
 
-1. **انتخابگر تاریخ اختصاصی شمسی (Persian Datepicker):**
-   * تقویم شمسی بومی با امکان پرش سریع بین ماه‌ها و سال‌ها.
-   * دکمه‌های پرکاربرد آماده: *"تمدید ۱ ماهه"*، *"تمدید ۳ ماهه"*، *"تمدید ۱ ساله"*.
-2. **رادار سررسید در هدر (Expiry Radar):**
-   * آیکون زنگوله با نشانگر عددی قرمز رنگ در بالای صفحه، دارایی‌های در معرض انقضا را اعلام می‌کند.
-   * با کلیک روی آن، یک پاپ‌اور با ردیف‌های دسته‌بندی‌شده بر اساس فوریت (امروز، این هفته، این ماه) باز می‌شود و با کلیک روی هر مورد مستقیماً به دارایی هدایت می‌گردد.
-3. **مودال «ثبت تمدید» (Log Renewal Modal):**
-   * کاربر با ۱ کلیک تاریخ جدید را ثبت می‌کند. فیلد مبلغ به تومان/ریال با فرمت جداکننده ۳ رقم ۳ رقم (`15,000,000 تومان`) به صورت خودکار خوانا می‌شود.
+1. **Datepicker:** Built-in support for both Solar Hijri (Jalali) and Gregorian calendars with quick-jump shortcuts (+1 Month, +3 Months, +1 Year).
+2. **Header Expiry Radar:** Bell badge highlights upcoming expirations. Clicking opens an urgency breakdown (Today, This Week, This Month).
+3. **Log Renewal Modal:** Clean 1-click renewal dialog with localized formatted currency separators (`15,000,000`).
 
 ---
 
-## ۹. وضعیت‌های حدی، پیام‌ها و خطاها (Edge States & Resilience)
+## 9. Edge States & System Resilience
 
-* **وضعیت‌های خالی (Empty States):**
-  * چنانچه دسته‌ای دارایی نداشته باشد، صفحه سفید خالی نشان داده نمی‌شود؛ بلکه یک ایلاستریشن خطی با پیام ترغیب‌کننده و یک دکمه برجسته *"اولین دارایی را ثبت کنید"* یا *"ایمپورت از فایل اکسل"* نمایش داده می‌شود.
-* **حالت لودینگ اسکلتی (Skeleton Screen):**
-  * به جای استفاده از لودینگ دایره‌ای خسته‌کننده، ردیف‌های خاکستری ملایم متحرک (Skeleton Shimmer) ساختار جدول را در ۱۰۰ میلی‌ثانیه اول بارگذاری شبیه‌سازی می‌کنند تا حس چابکی و لود آنی القا شود.
-* **فیلدهای متنی طولانی (Text Truncation):**
-  * متون طولانی با `...` کوتاه می‌شوند و با قرار گرفتن ماوس روی آن‌ها، مقدار کامل در یک تولتیپ هوشمند بدون شکستن ساختار جدول نمایش می‌یابد.
+* **Polished Empty States:** Categories without records display an illustrative call-to-action button (*"Create First Asset"* or *"Import from Excel"*).
+* **Skeleton Shimmer Loading:** Smooth skeleton placeholders simulate the grid layout during data fetching to maintain perceived performance.
+* **Smart Text Truncation:** Long values truncate with ellipses (`...`) while presenting the complete text in a smart hover tooltip.

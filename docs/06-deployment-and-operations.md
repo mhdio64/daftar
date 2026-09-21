@@ -1,16 +1,16 @@
-# 🚀 سند ۰۶: استقرار، نگهداری و زیرساخت (Deployment & Operations)
+# 🚀 Document 06: Deployment, Maintenance & Operations
 
 ---
 
-## ۱. استقرار با داکر کامپوز (Docker Compose Architecture)
+## 1. Docker Compose Architecture
 
-تمامی سرویس‌های مورد نیاز سامانه «دفتر» در قالب یک فایل `docker-compose.yml` یکپارچه و به صورت کانتینری در شبکه محلی بالا می‌آیند. هیچ وابستگی جانبی به اینترنت در زمان اجرای برنامه در سرور وجود ندارد.
+All components of the **Daftar** platform are containerized and orchestrated via `docker-compose.yml`. The system operates completely offline without external internet dependencies during runtime.
 
 ```yaml
 version: '3.8'
 
 services:
-  # وب‌سرور معکوس و مدیریت خودکار HTTPS
+  # Reverse proxy with automatic internal TLS
   caddy:
     image: caddy:2-alpine
     container_name: daftar_caddy
@@ -26,7 +26,7 @@ services:
     depends_on:
       - server
 
-  # برنامه بک‌اند API
+  # Fastify API backend server
   server:
     build:
       context: ./server
@@ -46,7 +46,7 @@ services:
       postgres:
         condition: service_healthy
 
-  # پایگاه‌داده اصلی
+  # Primary PostgreSQL 16 database
   postgres:
     image: postgres:16-alpine
     container_name: daftar_postgres
@@ -63,7 +63,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # سرویس بکاپ‌گیری خودکار روزانه
+  # Automated daily database backup runner
   backup:
     image: postgres:16-alpine
     container_name: daftar_backup
@@ -91,53 +91,52 @@ volumes:
 
 ---
 
-## ۲. متغیرهای محیطی و کلید اصلی رمزنگاری (`.env.example`)
+## 2. Environment Variables & Master Key (`.env.example`)
 
-برای راه‌اندازی، فایل `.env` باید در ریشه پروژه قرار داشته باشد:
+Before launching the stack, configure the `.env` file in the project root:
 
 ```env
-# پایگاه‌داده
+# Database Credentials
 POSTGRES_USER=daftar_admin
 POSTGRES_PASSWORD=strong_postgres_password_here
 POSTGRES_DB=daftar_db
 
-# توکن امنیتی نشست کاربران
+# User Session Security
 JWT_SECRET=super_secret_jwt_key_at_least_32_characters_long
 
-# کلید اصلی رمزنگاری متقارن AES-256 (باید دقیقا ۶۴ کاراکتر هگزادسیمال = ۳۲ بایت باشد)
-# نحوه تولید: دستور `openssl rand -hex 32` را در ترمینال اجرا کنید
+# AES-256 Symmetric Master Encryption Key (Exactly 64 hexadecimal characters = 32 bytes)
+# Generate via: openssl rand -hex 32
 MASTER_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
-# حداکثر حجم فایل‌های آپلود شده به بایت (۵۰ مگابایت)
+# Maximum Upload File Size in Bytes (50 MB)
 MAX_FILE_SIZE_BYTES=52428800
 ```
 
 > [!CAUTION]
-> **نکته بسیار حیاتی درباره `MASTER_ENCRYPTION_KEY`:**
-> اگر این کلید گم یا بازنویسی شود، تمامی رمزهای عبور ذخیره شده در پایگاه‌داده برای همیشه غیرقابل بازیابی خواهند شد! این کلید باید در یک مکان فیزیکی امن (مانند گاوصندوق یا فلش رمزگذاری شده آفلاین) نگهداری شود.
+> **Critical Warning Regarding `MASTER_ENCRYPTION_KEY`:**
+> If this key is lost or overwritten, all encrypted secrets (passwords, tokens, private keys) in the database become permanently unrecoverable. Securely store an offline backup copy of this key.
 
 ---
 
-## ۳. تنظیمات وب‌سرور و HTTPS برای شبکه محلی (`docker/Caddyfile`)
+## 3. Reverse Proxy Configuration (`docker/Caddyfile`)
 
-تنظیمات Caddy برای تولید خودکار گواهی امنیتی داخلی:
+Caddy handles automatic internal HTTPS and reverse proxies API traffic:
 
 ```caddy
-# به جای 192.168.1.100 می‌توانید آی‌پی سرور یا دامنه داخلی مانند vault.local را قرار دهید
 :443 {
     tls internal
 
-    # فایل‌های استاتیک برنامه فرانت‌اند (React SPA)
+    # React SPA static bundle
     root * /usr/share/caddy
     file_server
     try_files {path} /index.html
 
-    # مسیرهای API به بک‌اند هدایت می‌شوند
+    # Backend API proxy
     handle /api/* {
         reverse_proxy server:3000
     }
 
-    # امنیت و هدرهای امنیتی
+    # Security headers
     header {
         X-Frame-Options "DENY"
         X-Content-Type-Options "nosniff"
@@ -148,37 +147,37 @@ MAX_FILE_SIZE_BYTES=52428800
 
 ---
 
-## ۴. استراتژی پشتیبان‌گیری و بازیابی اضطراری (Backup & Disaster Recovery)
+## 4. Disaster Recovery & Backups
 
-### ۴.۱. اسکریپت بکاپ خودکار (`docker/backup.sh`)
-کانتینر بکاپ هر ۲۴ ساعت یک بار به صورت فشرده با فرمت استاندارد `pg_dump` بکاپ می‌گیرد و بکاپ‌های قدیمی‌تر از ۳۰ روز را به صورت خودکار پاک می‌کند:
+### 4.1. Automated Daily Backups (`docker/backup.sh`)
+The backup container runs every 24 hours, generating compressed `pg_dump` archives and maintaining a rolling 30-day retention cycle:
 ```bash
 #!/bin/sh
 while true; do
   DATE=$(date +%Y%m%d_%H%M%S)
   FILE="/backups/daftar_backup_${DATE}.sql.gz"
-  echo "[$(date)] شروع تهیه نسخه پشتیبان..."
+  echo "[$(date)] Starting automated backup..."
   PGPASSWORD=$POSTGRES_PASSWORD pg_dump -h $POSTGRES_HOST -U $POSTGRES_USER $POSTGRES_DB | gzip > $FILE
-  echo "[$(date)] بکاپ با موفقیت در $FILE ذخیره شد."
+  echo "[$(date)] Backup successfully saved to $FILE."
   
-  # حذف بکاپ‌های قدیمی‌تر از ۳۰ روز
+  # Prune backups older than 30 days
   find /backups -name "daftar_backup_*.sql.gz" -mtime +30 -delete
   
-  # انتظار به مدت ۲۴ ساعت
+  # Sleep for 24 hours
   sleep 86400
 done
 ```
 
-### ۴.۲. دستور بازیابی دیتابیس در صورت نیاز:
+### 4.2. Restoring a Database Dump:
 ```bash
 gunzip < /backups/daftar_backup_YYYYMMDD_HHMMSS.sql.gz | docker exec -i daftar_postgres psql -U daftar_admin -d daftar_db
 ```
 
 ---
 
-## ۵. چک‌لیست سخت‌سازی امنیتی در شبکه محلی (Hardening Checklist)
+## 5. Security Hardening Checklist
 
-- [ ] تغییر پسوردهای پیش‌فرض PostgreSQL و ایجاد کلید تصادفی ۶۴ کاراکتری برای `MASTER_ENCRYPTION_KEY`.
-- [ ] محدود کردن دسترسی پورت‌های دیتابیس (پورت ۵۴۳۲ فقط داخل شبکه داخلی داکر باز است و نباید روی پورت‌های فیزیکی سرور Expose شود).
-- [ ] تست اتصال به سامانه از طریق آدرس `https://<IP-Server>` و پذیرش گواهی خودامضا در مرورگر کلاینت‌ها.
-- [ ] نگهداری یک نسخه پشتیبان آفلاین از فایل `.env`.
+- [ ] Rotate default PostgreSQL credentials and generate a unique 64-char hex `MASTER_ENCRYPTION_KEY`.
+- [ ] Ensure database port 5432 is not exposed to the public internet or external interfaces.
+- [ ] Verify HTTPS connectivity and accept the internal certificate authority in client browsers.
+- [ ] Maintain an encrypted offline backup of the production `.env` configuration file.

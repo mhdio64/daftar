@@ -1,94 +1,104 @@
-# ⚙️ سند ۰۵: مشخصات کارکردی قابلیت‌های اصلی (Core Features Spec)
+# ⚙️ Document 05: Core Features Specification
 
 ---
 
-## ۱. ماژول سازنده فیلدها و انواع دارایی (Dynamic Schema Builder)
+## 1. Dynamic Schema Builder
 
-این ماژول به مدیران سیستم اجازه می‌دهد بدون نیاز به نوشتن حتی یک خط کد یا تغییر در ساختار جداول پایگاه‌داده، انواع دارایی‌های جدید ایجاد کرده و فرم‌های ورودی را طراحی نمایند.
+The Dynamic Schema Builder empowers administrators to create new asset categories and configure customized data fields on the fly without writing code or modifying database tables.
 
-### ۱.۱. جریان ایجاد نوع دارایی جدید (Asset Type Creation Flow)
-1. مدیر عنوان نوع دارایی (مثلاً «سوئیچ شبکه» یا «اکانت نرم‌افزار ابری»)، آیکون دلخواه و توضیحات را وارد می‌کند.
-2. با استفاده از رابط بصری «افزودن فیلد»، فیلدهای مورد نیاز را یکی‌یکی اضافه می‌کند:
-   - انتخاب عنوان فیلد به فارسی (مثلاً «آدرس پنل مدیریت»)
-   - شناسه انگلیسی سیستمی (مثلاً `admin_url`)
-   - تعیین نوع داده (متن، رمز عبور، آدرس IP، تاریخ، لیست انتخابی)
-   - تعیین وضعیت اجباری بودن (`isRequired: true/false`)
-   - برای فیلدهای انتخابی: درج گزینه‌ها (مثلاً `["سیسکو", "میکروتیک", "جونیپر"]`)
-3. سیستم به صورت خودکار یک اسکیما با فرمت JSON تولید و در ستون `schemaDefinition` ذخیره می‌کند.
+### 1.1. Category Creation Flow
+1. An administrator inputs the category name (e.g. "Network Switches", "Cloud Subscriptions"), selects a Lucide icon, and adds an optional description.
+2. Using the visual field builder, attributes are added incrementally:
+   - Field display label (e.g. "Management Console URL")
+   - System key identifier (e.g. `admin_url`)
+   - Data type (`text`, `secret`, `ip_port`, `jalali_date`, `select`, `email`, `textarea`, `url`)
+   - Mandatory validation requirement (`isRequired: true/false`)
+   - Predefined dropdown options (for `select` types)
+3. The platform generates a validated JSON schema and stores it in `schemaDefinition`.
 
-### ۱.۲. موتور اعتبارسنجی پویا (Dynamic Validation Engine)
-هنگام ثبت یا ویرایش هر دارایی، بک‌اند از پکیج اعتبارسنجی (مانند `Zod` یا `Ajv`) برای ایجاد یک اعتبارسنج داینامیک بر پایه `schemaDefinition` همان دسته استفاده می‌کند:
-- بررسی فیلدهای اجباری (`isRequired`).
-- اعتبارسنجی ساختار IP و پورت با Regex استاندارد.
-- اعتبارسنجی تاریخ‌های شمسی معتبر.
+### 1.2. Dynamic Validation Engine
+On every asset creation or update, the backend creates an on-the-fly validator adhering to the category's `schemaDefinition`:
+- Mandatory field enforcement.
+- IP address and port format validation.
+- Valid Jalali/Gregorian date formatting.
 
 ---
 
-## ۲. ماژول مدیریت سررسیدها و یادآورهای تمدید (Renewal Reminders)
+## 2. Renewal Reminders & Automated Notification Worker
 
-یکی از چالش‌های مکرر در شرکت‌ها، قطع ناگهانی سرویس‌ها یا سرورها به دلیل فراموشی موعد تمدید است. این ماژول فرآیند را کاملاً شفاف و هوشمند می‌سازد.
+Unplanned downtime caused by expired domains, certificates, or cloud instances is prevented through automated multi-stage alerts.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Active : ثبت دارایی با تاریخ انقضا
-    Active --> Warning30 : ۳۰ روز مانده به موعد (نشانگر زرد)
-    Warning30 --> Warning7 : ۷ روز مانده به موعد (نشانگر نارنجی)
-    Warning7 --> Critical1 : ۲۴ ساعت مانده (نشانگر قرمز چشمک‌زن)
-    Critical1 --> Expired : عبور از موعد (نشانگر خطر / منقضی شده)
+    [*] --> Active : Asset registered with expiry date
+    Active --> Warning30 : 30 days remaining (Yellow indicator)
+    Warning30 --> Warning7 : 7 days remaining (Orange indicator)
+    Warning7 --> Critical1 : 24 hours remaining (Flashing red indicator)
+    Critical1 --> Expired : Date passed (Critical expired status)
     
-    Warning30 --> Renewed : ثبت تمدید دوره جدید
-    Warning7 --> Renewed : ثبت تمدید دوره جدید
-    Critical1 --> Renewed : ثبت تمدید دوره جدید
-    Expired --> Renewed : ثبت تمدید دوره جدید
+    Warning30 --> Renewed : Log new renewal
+    Warning7 --> Renewed : Log new renewal
+    Critical1 --> Renewed : Log new renewal
+    Expired --> Renewed : Log new renewal
     
-    Renewed --> Active : به‌روزرسانی خودکار تاریخ و درج در RenewalLog
+    Renewed --> Active : Automatic date update & RenewalLog recorded
 ```
 
-### ۲.۱. فرآیند «ثبت تمدید» (Log Renewal Workflow)
-هنگامی که مسئول خرید فاکتور یا لایسنس جدید را پرداخت می‌کند، روی دکمه **«ثبت تمدید»** کلیک می‌کند. یک مودال باز می‌شود:
-- تاریخ انقضای جدید (انتخاب با تقویم شمسی).
-- مبلغ تمدید (به ریال/تومان) جهت گزارش‌های مالی آینده.
-- شماره فاکتور یا نام شرکت ارائه‌دهنده سرویس.
-- پیوست فاکتور یا سند پرداخت (تصویر یا PDF).
-- سیستم تاریخ دارایی را به‌روزرسانی کرده و یک رکورد دائمی در جدول `RenewalLog` ثبت می‌کند تا تاریخچه تمام هزینه‌های پرداخت‌شده برای آن دارایی در طول زمان حفظ شود.
+### 2.1. Multi-Channel Notification Worker
+A background worker continuously monitors upcoming expirations and triggers notifications via:
+- **Telegram Bot Webhooks**
+- **Bale Messenger Webhooks**
+- **Discord Webhooks**
+- **Custom JSON Webhooks**
+- **Email / SMS Gateways**
+
+Thresholds trigger automated messages at **30 days, 7 days, 24 hours, and day-of expiration**, complemented by automated weekly digest summaries.
+
+### 2.2. Renewal Logging Workflow
+When a subscription or asset is renewed:
+1. The user clicks **"Log Renewal"**.
+2. A modal prompts for:
+   - New expiration date
+   - Renewal cost in organizational currency
+   - Vendor invoice number and notes
+   - Attached proof of payment or receipt
+3. The asset's `expiryDate` updates, and an immutable entry is added to `RenewalLog`.
 
 ---
 
-## ۳. موتور جستجوی سراسری ایمن (Secure Global Search)
+## 3. Secure Global Search
 
-- **فعال‌سازی سریع:** فشردن کلیدهای `Ctrl + K` یا `Cmd + K` از هر کجای برنامه.
-- **دامنه جستجو:**
-  * نام و عنوان دارایی‌ها.
-  * مقادیر تمام فیلدهای متنی (آدرس‌های IP، نام کاربری، پورت‌ها، شماره سریال‌ها).
-  * محتوای مستندات Markdown درون دارایی‌ها.
-- **حفظ حریم امنیتی:** کوئری جستجو به هیچ وجه در مقادیر رمزهای عبور سرچ انجام نمی‌دهد؛ بنابراین امکان ندارد کاربری با سرچ کردن یک پسورد حدسی بفهمد کدام سرورها آن پسورد را دارند.
-- **سرعت پاسخ:** با استفاده از ایندکس‌های Trigram و GIN در PostgreSQL، نتایج در کمتر از ۵۰ میلی‌ثانیه فیلتر و با هایلایت کردن کلمه جستجو شده نمایش داده می‌شوند.
-
----
-
-## ۴. ماژول ایمپورت و اکسپورت اکسل (Excel / CSV Engine)
-
-بسیاری از شرکت‌ها در حال حاضر فایل‌های اکسل موجود دارند. برای مهاجرت بی‌دردسر:
-
-### ۴.۱. دریافت خروجی اکسل استاندارد (Template Export)
-کاربر در هر دسته دارایی (مثلاً VPS) روی گزینه «دریافت تمپلیت اکسل» کلیک می‌کند. سیستم یک فایل `.xlsx` تولید می‌کند که سرستون‌های آن دقیقاً مطابق با فیلدهای تعریف‌شده آن دسته است (با نشان دادن ستون‌های اجباری با علامت ستاره `*`).
-
-### ۴.۲. بارگذاری و ایمپورت دسته‌ای (Batch Import)
-1. کاربر فایل اکسل پرشده را آپلود می‌کند.
-2. سیستم پیش‌نمایشی از ردیف‌ها نشان می‌دهد و خطاهای احتمالی (مثل خالی بودن فیلدهای اجباری یا نامعتبر بودن فرمت IP) را مشخص می‌کند.
-3. با تایید نهایی، تمام رکوردهای صحیح به صورت تراکنشی (Database Transaction) ثبت می‌شوند. فیلدهای پسورد در حین ایمپورت بلافاصله با AES رمزنگاری می‌گردند.
-
-### ۴.۳. گزارش‌گیری اکسل (Data Export)
-کاربران مجاز می‌توانند از جدول فیلترشده خروجی اکسل بگیرند. در این خروجی، ستون پسوردها برای کاربران غیرمجاز خالی یا با کاراکتر `***` جایگزین می‌شود.
+- **Instant Trigger:** Pressing `Ctrl + K` or `Cmd + K` opens the search palette from any page.
+- **Search Scope:**
+  * Asset titles and identifiers
+  * Text fields (IP addresses, hostnames, usernames, serial numbers)
+  * Markdown documentation and runbooks
+- **Zero-Knowledge Privacy:** Secrets and passwords are explicitly excluded from full-text indexes.
+- **Sub-50ms Response:** Powered by PostgreSQL Trigram and GIN indexes, results return instantly with keyword highlighting.
 
 ---
 
-## ۵. سیستم ردگیری و ممیزی رویدادها (Audit Trail System)
+## 4. Excel & CSV Data Pipeline
 
-هیچ رخدادی در سیستم بدون ثبت ناپدید نمی‌شود. سیستم ممیزی دو دسته لاگ ثبت می‌کند:
+### 4.1. Template Export
+Administrators can download customized `.xlsx` templates preconfigured with the exact column headers matching an asset category, with required columns marked with an asterisk (`*`).
 
-### ۵.۱. لاگ تغییرات مقادیر (Mutation Diff)
-هنگام ایجاد، ویرایش یا حذف یک رکورد، تغییرات فیلدها محاسبه و ثبت می‌شود:
+### 4.2. Batch Import
+1. Users upload populated Excel spreadsheets.
+2. The system previews rows, highlighting formatting issues and missing mandatory fields.
+3. Upon approval, records are committed in a single database transaction. Secret fields are encrypted on the fly with AES-256-GCM.
+
+### 4.3. Filtered Export
+Authorized users can export the current grid view into an `.xlsx` workbook. Passwords and secret tokens are automatically redacted unless the user holds elevated permissions.
+
+---
+
+## 5. Comprehensive Audit Trail
+
+Every state change and security event is permanently recorded:
+
+### 5.1. Mutation Diffs
+Record creations, updates, and deletions capture precise before-and-after attribute values:
 ```json
 {
   "action": "UPDATE",
@@ -99,11 +109,11 @@ stateDiagram-v2
     "ip_address": { "old": "192.168.1.10", "new": "192.168.1.50" },
     "ssh_port": { "old": "22", "new": "2222" }
   },
-  "timestamp": "2026-09-19T18:30:00Z"
+  "timestamp": "2026-09-22T00:15:00Z"
 }
 ```
 
-### ۵.۲. لاگ امنیتی دسترسی به اسرار (Secret Access Log)
-هر بار که کاربری روی دکمه چشم (نمایش رمز) یا کپی کلیک می‌کند:
-- شناسه کاربر، نام فیلد، آدرس IP و شناسه دارایی ثبت می‌شود.
-- مدیر ارشد در صفحه «گزارش لاگ‌ها» می‌تواند ببیند چه کسانی در طول روز کدام پسوردها را کپی کرده‌اند.
+### 5.2. Secret Access Audit
+Whenever a credential is revealed or copied:
+- The user ID, timestamp, client IP, and target field are logged.
+- Administrators can audit credential usage patterns directly in the Audit Trail dashboard.
