@@ -24,6 +24,9 @@ model User {
   role                Role         @default(VIEWER)
   categoryPermissions Json         @default("[]") // آرایه‌ای از شناسه‌های AssetType مجاز
   isActive            Boolean      @default(true)
+  twoFactorEnabled    Boolean      @default(false)
+  twoFactorSecret     String?
+  twoFactorRecoveryCodes Json      @default("[]") // کدهای بازیابی اضطراری یکبارمصرف
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 

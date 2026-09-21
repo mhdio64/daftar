@@ -7,6 +7,7 @@ export interface ManagedUser {
   role: 'ADMIN' | 'EDITOR' | 'VIEWER';
   categoryPermissions: string[];
   isActive: boolean;
+  twoFactorEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
   assetsCount?: number;

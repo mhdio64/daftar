@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Calendar, ExternalLink } from 'lucide-react';
+import { Sparkles, Calendar, ExternalLink, Mail } from 'lucide-react';
 import { FieldDefinition } from '../../services/asset-types.service.ts';
 import { PasswordGeneratorModal } from '../modals/PasswordGeneratorModal.tsx';
 
@@ -105,6 +105,18 @@ export function DynamicForm({ schema, values, onChange }: DynamicFormProps) {
                 placeholder="192.168.1.1:22"
                 className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-indigo-300 font-mono placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/20 transition"
               />
+            ) : field.type === 'email' ? (
+              <div className="relative">
+                <input
+                  type="email"
+                  value={value}
+                  onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                  dir="ltr"
+                  placeholder="user@example.com"
+                  className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-cyan-300 font-mono placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/20 transition pl-8"
+                />
+                <Mail className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
             ) : field.type === 'url' ? (
               <div className="relative">
                 <input

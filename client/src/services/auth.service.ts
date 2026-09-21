@@ -6,12 +6,15 @@ export interface User {
   fullName: string;
   role: 'ADMIN' | 'EDITOR' | 'VIEWER';
   categoryPermissions: string[];
+  twoFactorEnabled?: boolean;
 }
 
 export interface AuthResponse {
+  requires2FA?: boolean;
+  tempToken?: string;
   message: string;
-  token: string;
-  user: User;
+  token?: string;
+  user?: User;
 }
 
 export const authService = {
@@ -21,16 +24,45 @@ export const authService = {
 
   async setupAdmin(data: { username: string; fullName: string; password: string }): Promise<AuthResponse> {
     const res = await api.post<AuthResponse>('/auth/setup', data);
-    localStorage.setItem('daftar_token', res.token);
-    localStorage.setItem('daftar_user', JSON.stringify(res.user));
+    if (res.token && res.user) {
+      localStorage.setItem('daftar_token', res.token);
+      localStorage.setItem('daftar_user', JSON.stringify(res.user));
+    }
     return res;
   },
 
   async login(username: string, password: string): Promise<AuthResponse> {
     const res = await api.post<AuthResponse>('/auth/login', { username, password });
-    localStorage.setItem('daftar_token', res.token);
-    localStorage.setItem('daftar_user', JSON.stringify(res.user));
+    if (!res.requires2FA && res.token && res.user) {
+      localStorage.setItem('daftar_token', res.token);
+      localStorage.setItem('daftar_user', JSON.stringify(res.user));
+    }
     return res;
+  },
+
+  async verify2FA(tempToken: string, code: string): Promise<AuthResponse> {
+    const res = await api.post<AuthResponse>('/auth/verify-2fa', { tempToken, code });
+    if (res.token && res.user) {
+      localStorage.setItem('daftar_token', res.token);
+      localStorage.setItem('daftar_user', JSON.stringify(res.user));
+    }
+    return res;
+  },
+
+  async setup2FA(): Promise<{ secret: string; otpauthUrl: string }> {
+    return api.post<{ secret: string; otpauthUrl: string }>('/auth/2fa/setup');
+  },
+
+  async enable2FA(secret: string, code: string): Promise<{ message: string; recoveryCodes: string[] }> {
+    return api.post<{ message: string; recoveryCodes: string[] }>('/auth/2fa/enable', { secret, code });
+  },
+
+  async disable2FA(password: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>('/auth/2fa/disable', { password });
+  },
+
+  async regenerateRecoveryCodes(): Promise<{ message: string; recoveryCodes: string[] }> {
+    return api.post<{ message: string; recoveryCodes: string[] }>('/auth/2fa/recovery-codes');
   },
 
   async getMe(): Promise<{ user: User }> {

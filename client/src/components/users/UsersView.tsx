@@ -30,6 +30,7 @@ const DEMO_USERS: ManagedUser[] = [
     role: 'ADMIN',
     categoryPermissions: [],
     isActive: true,
+    twoFactorEnabled: true,
     assetsCount: 12,
     activityCount: 48,
     createdAt: '2026-09-01T10:00:00.000Z',
@@ -42,6 +43,7 @@ const DEMO_USERS: ManagedUser[] = [
     role: 'EDITOR',
     categoryPermissions: ['vps', 'domains'],
     isActive: true,
+    twoFactorEnabled: false,
     assetsCount: 7,
     activityCount: 23,
     createdAt: '2026-09-05T11:20:00.000Z',
@@ -54,6 +56,7 @@ const DEMO_USERS: ManagedUser[] = [
     role: 'VIEWER',
     categoryPermissions: ['licenses', 'email'],
     isActive: true,
+    twoFactorEnabled: false,
     assetsCount: 0,
     activityCount: 9,
     createdAt: '2026-09-10T08:45:00.000Z',
@@ -306,6 +309,7 @@ export function UsersView({ assetTypes }: UsersViewProps) {
               <th className="p-3 font-mono">نام کاربری</th>
               <th className="p-3">نقش و سطح اختیارات</th>
               <th className="p-3">دسته‌های مجاز</th>
+              <th className="p-3 text-center">امنیت 2FA</th>
               <th className="p-3">وضعیت حساب</th>
               <th className="p-3 text-center">عملیات</th>
             </tr>
@@ -313,7 +317,7 @@ export function UsersView({ assetTypes }: UsersViewProps) {
           <tbody className="divide-y divide-slate-200/80 dark:divide-border-subtle">
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={8} className="p-8 text-center text-slate-500 dark:text-slate-400">
                   در حال بارگذاری لیست کاربران...
                 </td>
               </tr>
@@ -355,6 +359,18 @@ export function UsersView({ assetTypes }: UsersViewProps) {
                         <span className="text-rose-600 dark:text-rose-400 text-[11px] font-medium">بدون دسترسی به دسته‌ها</span>
                       )}
                     </td>
+                    <td className="p-3 text-center">
+                      {u.twoFactorEnabled ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          <span>فعال (TOTP)</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-surface-2 dark:text-slate-400">
+                          <span>غیرفعال</span>
+                        </span>
+                      )}
+                    </td>
                     <td className="p-3">
                       {u.isActive ? (
                         <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 text-[11px] font-medium">
@@ -393,7 +409,7 @@ export function UsersView({ assetTypes }: UsersViewProps) {
               })
             ) : (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={8} className="p-8 text-center text-slate-500 dark:text-slate-400">
                   کاربری یافت نشد.
                 </td>
               </tr>

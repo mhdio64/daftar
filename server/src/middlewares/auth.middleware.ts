@@ -13,11 +13,18 @@ declare module '@fastify/jwt' {
  */
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
-  if (authHeader === 'Bearer demo-token-preview') {
+
+  // پشتیبانی از توکن پیش‌نمایش فقط در محیط توسعه در صورت تنظیم صریح فلگ محیطی
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.ENABLE_DEV_DEMO_BYPASS === 'true' &&
+    authHeader === 'Bearer demo-token-preview'
+  ) {
+    request.log.warn('⚠️ دسترسی موقت با توکن دمو در محیط توسعه فعال است.');
     request.user = {
       id: 'demo-admin',
       username: 'admin',
-      fullName: 'علی رضایی (مدیر ارشد)',
+      fullName: 'علی رضایی (مدیر ارشد دمو)',
       role: Role.ADMIN,
       categoryPermissions: [],
     };

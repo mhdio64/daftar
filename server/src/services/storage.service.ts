@@ -26,10 +26,23 @@ export class StorageService {
   }
 
   /**
-   * تولید نام امن و یکتا برای ذخیره‌سازی روی دیسک
+   * لیست پسوندهای پرخطر، اسکریپتی و اجرایی که بارگذاری آن‌ها مسدود است
+   */
+  private static readonly DANGEROUS_EXTENSIONS = new Set([
+    '.exe', '.dll', '.so', '.sh', '.bash', '.bat', '.cmd', '.ps1', '.vbs',
+    '.php', '.phtml', '.php3', '.php4', '.php5', '.phps',
+    '.asp', '.aspx', '.jsp', '.jspx', '.cgi', '.pl', '.py',
+    '.jar', '.war', '.ear', '.html', '.htm', '.xhtml',
+  ]);
+
+  /**
+   * تولید نام امن و یکتا برای ذخیره‌سازی روی دیسک با پالایش پسوند
    */
   public generateStorageFilename(originalName: string): string {
     const ext = path.extname(originalName).toLowerCase();
+    if (StorageService.DANGEROUS_EXTENSIONS.has(ext)) {
+      throw new Error(`خطای امنیتی: بارگذاری فایل‌های اجرایی و اسکریپتی با پسوند "${ext}" مسدود است.`);
+    }
     const uniqueId = crypto.randomUUID();
     return `${uniqueId}${ext}`;
   }

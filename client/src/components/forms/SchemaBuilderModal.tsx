@@ -144,7 +144,14 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
                     {f.isSecret && <span className="text-amber-800 bg-amber-50 border border-amber-200/80 dark:bg-amber-500/10 dark:text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-medium">محرمانه (AES)</span>}
                   </div>
                   <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
-                    کلید: {f.name} | نوع: {f.type}
+                    کلید: {f.name} | نوع: {
+                      f.type === 'email' ? 'آدرس ایمیل' :
+                      f.type === 'secret' ? 'رمز عبور / محرمانه' :
+                      f.type === 'ip_port' ? 'آدرس IP و پورت' :
+                      f.type === 'jalali_date' ? 'تاریخ سررسید' :
+                      f.type === 'select' ? 'لیست انتخابی' :
+                      f.type === 'url' ? 'لینک وب' : 'متن ساده'
+                    }
                   </div>
                 </div>
               </div>
@@ -225,6 +232,7 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
                   className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-1.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-600 transition"
                 >
                   <option value="text">متن ساده</option>
+                  <option value="email">آدرس ایمیل (Email)</option>
                   <option value="secret">رمز عبور / محرمانه (AES-256)</option>
                   <option value="ip_port">آدرس IP و پورت</option>
                   <option value="jalali_date">تاریخ سررسید تمدید</option>

@@ -29,7 +29,8 @@ import {
   RotateCcw,
   Network,
   LayoutDashboard,
-  X
+  X,
+  ScanLine
 } from 'lucide-react';
 
 import { ToastProvider, useToast } from './context/ToastContext.tsx';
@@ -42,6 +43,7 @@ import { SecretCell } from './components/grid/SecretCell.tsx';
 import { AssetDrawer } from './components/drawer/AssetDrawer.tsx';
 import { SchemaBuilderModal } from './components/forms/SchemaBuilderModal.tsx';
 import { ExcelImportModal } from './components/modals/ExcelImportModal.tsx';
+import { ExcelExportModal } from './components/modals/ExcelExportModal.tsx';
 import { CategoryWikiView } from './components/wiki/CategoryWikiView.tsx';
 import { RemindersView } from './components/reminders/RemindersView.tsx';
 import { UsersView } from './components/users/UsersView.tsx';
@@ -50,10 +52,11 @@ import { SettingsView } from './components/settings/SettingsView.tsx';
 import { PasswordGeneratorModal } from './components/modals/PasswordGeneratorModal.tsx';
 import { TagBadge } from './components/common/TagBadge.tsx';
 import { ExecutiveDashboardView } from './components/dashboard/ExecutiveDashboardView.tsx';
+import { AssetQrScannerModal } from './components/common/AssetQrScannerModal.tsx';
 
 import { assetTypesService, AssetType } from './services/asset-types.service.ts';
 import { assetsService, Asset } from './services/assets.service.ts';
-import { exportAssetsToExcel, ParsedRow } from './services/excel.service.ts';
+import { ParsedRow } from './services/excel.service.ts';
 
 // بررسی وضعیت سررسید دارایی جهت فیلتر هوشمند
 function checkAssetExpiry(asset: Asset): { hasExpiry: boolean; isExpired: boolean; isUrgent: boolean } {
@@ -81,6 +84,269 @@ function checkAssetExpiry(asset: Asset): { hasExpiry: boolean; isExpired: boolea
   }
 
   return { hasExpiry: true, isExpired: false, isUrgent: false };
+}
+
+// ساخت لیست کامل دارایی‌های نمونه دمو شامل سرورها، دیتابیس، دامنه‌ها، ایمیل‌ها و لایسنس‌ها
+function getAllSampleAssets(types: AssetType[]): Asset[] {
+  const vpsType = types.find((t) => t.id === 'vps') || types[0];
+  const emailType = types.find((t) => t.id === 'email') || types[0];
+  const domType = types.find((t) => t.id === 'domains') || types[0];
+  const licType = types.find((t) => t.id === 'licenses') || types[0];
+
+  return [
+    {
+      id: 'vps-1',
+      assetTypeId: 'vps',
+      assetType: vpsType,
+      title: 'سرور اصلی دیتاسنتر تهران',
+      tags: ['Production', 'اصلی', 'Critical'],
+      relations: [
+        {
+          id: 'rel-1',
+          targetAssetId: 'vps-2',
+          type: 'DEPENDS_ON',
+          note: 'لودبالانسر ورودی ترافیک',
+        },
+        {
+          id: 'rel-2',
+          targetAssetId: 'vps-3',
+          type: 'BACKUP_OF',
+          note: 'بکاپ روزانه در دیتاسنتر آلمان',
+        },
+      ],
+      expiryDate: new Date(Date.now() + 55 * 86400000).toISOString(),
+      values: {
+        ip_address: '192.168.10.15:22',
+        ssh_port: '22',
+        root_user: 'root',
+        root_password: '••••••••',
+        os_type: 'Ubuntu 24.04',
+        cost_amount: '4,500,000',
+        cost_currency: 'تومان',
+        billing_cycle: 'ماهانه',
+        expiry_date: '۱۴۰۵/۰۲/۱۵',
+      },
+      docsMarkdown: `# راهنمای اتصال به سرور تهران\n- آی‌پی: 192.168.10.15\n- دستور اتصال SSH:\n\`ssh root@192.168.10.15 -p 22\``,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'vps-2',
+      assetTypeId: 'vps',
+      assetType: vpsType,
+      title: 'لودبالانسر و پروکسی شبکه',
+      tags: ['Production', 'شبکه', 'پروکسی'],
+      expiryDate: new Date(Date.now() + 180 * 86400000).toISOString(),
+      relations: [
+        {
+          id: 'rel-lb-1',
+          targetAssetId: 'vps-1',
+          type: 'DEPENDS_ON',
+          note: 'توزیع بار روی سرور اصلی',
+        },
+      ],
+      values: {
+        ip_address: '10.0.1.5:443',
+        ssh_port: '2222',
+        root_user: 'admin',
+        root_password: '••••••••',
+        os_type: 'Debian 12',
+        cost_amount: '1,800,000',
+        cost_currency: 'تومان',
+        billing_cycle: 'ماهانه',
+        expiry_date: '۱۴۰۴/۱۲/۲۸',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'vps-3',
+      assetTypeId: 'vps',
+      assetType: vpsType,
+      title: 'سرور بکاپ آلمان (Hetzner)',
+      tags: ['Backup', 'Staging', 'آلمان'],
+      expiryDate: new Date(Date.now() + 6 * 86400000).toISOString(),
+      relations: [
+        {
+          id: 'rel-3',
+          targetAssetId: 'vps-1',
+          type: 'BACKUP_OF',
+          note: 'پشتیبان‌گیری از دیتابیس و فایل‌های سرور تهران',
+        },
+      ],
+      values: {
+        ip_address: '89.144.20.12',
+        ssh_port: '22',
+        root_user: 'backup_usr',
+        root_password: '••••••••',
+        os_type: 'Rocky Linux 9',
+        cost_amount: '38',
+        cost_currency: 'یورو (€)',
+        billing_cycle: 'ماهانه',
+        expiry_date: '۷ روز دیگر',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'demo-db-1',
+      assetTypeId: 'vps',
+      assetType: vpsType,
+      title: 'دیتابیس اصلی PostgreSQL (کانتینر داکر)',
+      tags: ['Database', 'PostgreSQL', 'Critical', 'Production'],
+      relations: [
+        {
+          id: 'rel-db-1',
+          targetAssetId: 'vps-1',
+          type: 'HOSTED_ON',
+          note: 'میزبانی روی سرور اصلی دیتاسنتر تهران',
+        },
+      ],
+      expiryDate: new Date(Date.now() + 120 * 86400000).toISOString(),
+      values: {
+        ip_address: '192.168.10.15:5432',
+        ssh_port: '5432',
+        root_user: 'postgres',
+        root_password: '••••••••',
+        os_type: 'PostgreSQL 16 (Debian 12)',
+        cost_amount: '2,800,000',
+        cost_currency: 'تومان',
+        billing_cycle: 'ماهانه',
+        expiry_date: '۱۴۰۵/۰۱/۱۵',
+      },
+      docsMarkdown: `# مستندات پایگاه داده اصلی PostgreSQL\n- کانتینر: \`postgres-prod\`\n- پورت سرویس: \`5432\`\n- نام دیتابیس‌های اصلی: \`daftar_production\`, \`auth_db\`\n- دستور اتصال:\n\`psql -h 192.168.10.15 -U postgres -d daftar_production\``,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'em-1',
+      assetTypeId: 'email',
+      assetType: emailType,
+      title: 'ایمیل رسمی مدیر عامل',
+      tags: ['مدیریت', 'Internal'],
+      relations: [
+        {
+          id: 'rel-em-1',
+          targetAssetId: 'vps-1',
+          type: 'HOSTED_ON',
+          note: 'میزبانی روی میل‌سرور سرور تهران',
+        },
+      ],
+      values: {
+        email_address: 'ceo@company.ir',
+        password: '••••••••',
+        department: 'مدیریت',
+        storage_quota: '50 GB',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'em-2',
+      assetTypeId: 'email',
+      assetType: emailType,
+      title: 'ایمیل دپارتمان مالی',
+      tags: ['مالی', 'Internal'],
+      values: {
+        email_address: 'finance@company.ir',
+        password: '••••••••',
+        department: 'مالی',
+        storage_quota: '20 GB',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'dom-1',
+      assetTypeId: 'domains',
+      assetType: domType,
+      title: 'دامنه اصلی شرکت (company.ir)',
+      tags: ['Production', 'برند اصلی'],
+      expiryDate: new Date(Date.now() + 320 * 86400000).toISOString(),
+      relations: [
+        {
+          id: 'rel-dom-1',
+          targetAssetId: 'vps-1',
+          type: 'POINTS_TO',
+          note: 'DNS A Record -> 192.168.10.15',
+        },
+      ],
+      values: {
+        domain_name: 'company.ir',
+        registrar: 'ایران‌سرور / ایرنیک',
+        cost_amount: '650,000',
+        cost_currency: 'تومان',
+        billing_cycle: 'سالانه',
+        expiry_date: '۱۴۰۵/۰۶/۳۰',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'dom-2',
+      assetTypeId: 'domains',
+      assetType: domType,
+      title: 'دامنه بین‌المللی برند (company.com)',
+      tags: ['بین‌المللی', 'برند'],
+      expiryDate: new Date(Date.now() + 14 * 86400000).toISOString(),
+      relations: [
+        {
+          id: 'rel-dom-2',
+          targetAssetId: 'vps-2',
+          type: 'POINTS_TO',
+          note: 'اتصال به لودبالانسر شبکه',
+        },
+      ],
+      values: {
+        domain_name: 'company.com',
+        registrar: 'Namecheap',
+        cost_amount: '16',
+        cost_currency: 'دلار ($)',
+        billing_cycle: 'سالانه',
+        expiry_date: '۱۴۰۴/۱۱/۱۵',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'lic-1',
+      assetTypeId: 'licenses',
+      assetType: licType,
+      title: 'لایسنس ابری JetBrains All Products',
+      tags: ['Cloud', 'توسعه'],
+      expiryDate: new Date(Date.now() + 190 * 86400000).toISOString(),
+      values: {
+        software_name: 'JetBrains Toolbox',
+        license_key: '••••••••',
+        vendor: 'JetBrains s.r.o.',
+        cost_amount: '290',
+        cost_currency: 'دلار ($)',
+        billing_cycle: 'سالانه',
+        expiry_date: '۱۴۰۵/۰۱/۲۰',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'lic-2',
+      assetTypeId: 'licenses',
+      assetType: licType,
+      title: 'اشتراک سالانه GitKraken Pro',
+      tags: ['ابزار', 'توسعه'],
+      expiryDate: new Date(Date.now() - 2 * 86400000).toISOString(),
+      values: {
+        software_name: 'GitKraken Client',
+        license_key: '••••••••',
+        vendor: 'Axosoft',
+        cost_amount: '60',
+        cost_currency: 'دلار ($)',
+        billing_cycle: 'سالانه',
+        expiry_date: '۱۴۰۴/۱۰/۰۱',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ];
 }
 
 function AppContent() {
@@ -111,6 +377,7 @@ function AppContent() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [isGlobalPassModalOpen, setIsGlobalPassModalOpen] = useState(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [isAddingNewType, setIsAddingNewType] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeSlug, setNewTypeSlug] = useState('');
@@ -122,6 +389,7 @@ function AppContent() {
 
   const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [categoryViewTab, setCategoryViewTab] = useState<'grid' | 'wiki'>('grid');
 
   // استیت‌های فیلتر پیشرفته و سیستم برچسب‌ها
@@ -227,19 +495,9 @@ function AppContent() {
     updateSettings({ theme: theme === 'light' ? 'dark' : 'light' });
   };
 
-  // خروجی اکسل از دارایی‌های جاری این دسته با ستون‌های انتخابی کاربر
+  // باز کردن مودال جامع خروجی اکسل و گزارش‌های تحلیلی مدیریتی
   const handleExportExcel = () => {
-    if (!activeAssetType) return;
-    if (assets.length === 0) {
-      showToast('هیچ دارایی برای خروجی اکسل در این دسته وجود ندارد.', 'info');
-      return;
-    }
-    try {
-      exportAssetsToExcel({ ...activeAssetType, schemaDefinition: visibleFields }, assets);
-      showToast(`خروجی اکسل «${activeAssetType.name}» با موفقیت دانلود شد.`, 'success');
-    } catch (err: any) {
-      showToast(err.message || 'خطا در صدور خروجی اکسل', 'error');
-    }
+    setIsExportModalOpen(true);
   };
 
   // ورود دسته‌ای دارایی‌ها از فایل اکسل اعتبارسنجی شده
@@ -356,7 +614,7 @@ function AppContent() {
         displayOrder: 2,
         assetCount: 4,
         schemaDefinition: [
-          { id: 'f_em', name: 'email_address', label: 'آدرس ایمیل', type: 'text', isRequired: true, showInTable: true },
+          { id: 'f_em', name: 'email_address', label: 'آدرس ایمیل', type: 'email', isRequired: true, showInTable: true, isCopyable: true },
           { id: 'f_ep', name: 'password', label: 'رمز عبور ایمیل', type: 'secret', isRequired: true, isSecret: true, showInTable: true },
           { id: 'f_dp', name: 'department', label: 'واحد سازمانی', type: 'select', options: ['فنی و IT', 'مالی', 'پشتیبانی', 'مدیریت'], isRequired: false, showInTable: true },
           { id: 'f_qt', name: 'storage_quota', label: 'سقف فضا', type: 'text', isRequired: false, showInTable: true },
@@ -438,211 +696,7 @@ function AppContent() {
     } catch {}
 
     // تولید داده‌های نمونه برای پیش‌نمایش با برچسب‌های پیش‌فرض
-    let sampleAssets: Asset[] = [];
-    if (typeId === 'vps') {
-      sampleAssets = [
-        {
-          id: 'vps-1',
-          assetTypeId: 'vps',
-          assetType: activeAssetType!,
-          title: 'سرور اصلی دیتاسنتر تهران',
-          tags: ['Production', 'اصلی', 'Critical'],
-          relations: [
-            {
-              id: 'rel-1',
-              targetAssetId: 'vps-2',
-              type: 'DEPENDS_ON',
-              note: 'لودبالانسر ورودی ترافیک',
-            },
-            {
-              id: 'rel-2',
-              targetAssetId: 'vps-3',
-              type: 'BACKUP_OF',
-              note: 'بکاپ روزانه در دیتاسنتر آلمان',
-            },
-          ],
-          expiryDate: new Date(Date.now() + 55 * 86400000).toISOString(),
-          values: {
-            ip_address: '192.168.10.15:22',
-            ssh_port: '22',
-            root_user: 'root',
-            root_password: '••••••••',
-            os_type: 'Ubuntu 24.04',
-            cost_amount: '4,500,000',
-            cost_currency: 'تومان',
-            billing_cycle: 'ماهانه',
-            expiry_date: '۱۴۰۵/۰۲/۱۵',
-          },
-          docsMarkdown: `# راهنمای اتصال به سرور تهران\n- آی‌پی: 192.168.10.15\n- دستور اتصال SSH:\n\`ssh root@192.168.10.15 -p 22\``,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'vps-2',
-          assetTypeId: 'vps',
-          assetType: activeAssetType!,
-          title: 'لودبالانسر و پروکسی شبکه',
-          tags: ['Production', 'شبکه', 'پروکسی'],
-          expiryDate: new Date(Date.now() + 180 * 86400000).toISOString(),
-          values: {
-            ip_address: '10.0.1.5:443',
-            ssh_port: '2222',
-            root_user: 'admin',
-            root_password: '••••••••',
-            os_type: 'Debian 12',
-            cost_amount: '1,800,000',
-            cost_currency: 'تومان',
-            billing_cycle: 'ماهانه',
-            expiry_date: '۱۴۰۴/۱۲/۲۸',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'vps-3',
-          assetTypeId: 'vps',
-          assetType: activeAssetType!,
-          title: 'سرور بکاپ آلمان (Hetzner)',
-          tags: ['Backup', 'Staging', 'آلمان'],
-          expiryDate: new Date(Date.now() + 6 * 86400000).toISOString(),
-          relations: [
-            {
-              id: 'rel-3',
-              targetAssetId: 'vps-1',
-              type: 'BACKUP_OF',
-              note: 'پشتیبان‌گیری از دیتابیس و فایل‌های سرور تهران',
-            },
-          ],
-          values: {
-            ip_address: '89.144.20.12',
-            ssh_port: '22',
-            root_user: 'backup_usr',
-            root_password: '••••••••',
-            os_type: 'Rocky Linux 9',
-            cost_amount: '38',
-            cost_currency: 'یورو (€)',
-            billing_cycle: 'ماهانه',
-            expiry_date: '۷ روز دیگر',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-    } else if (typeId === 'email') {
-      sampleAssets = [
-        {
-          id: 'em-1',
-          assetTypeId: 'email',
-          assetType: activeAssetType!,
-          title: 'ایمیل رسمی مدیر عامل',
-          tags: ['مدیریت', 'Internal'],
-          values: {
-            email_address: 'ceo@company.ir',
-            password: '••••••••',
-            department: 'مدیریت',
-            storage_quota: '50 GB',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'em-2',
-          assetTypeId: 'email',
-          assetType: activeAssetType!,
-          title: 'ایمیل دپارتمان مالی',
-          tags: ['مالی', 'Internal'],
-          values: {
-            email_address: 'finance@company.ir',
-            password: '••••••••',
-            department: 'مالی',
-            storage_quota: '20 GB',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-    } else if (typeId === 'domains') {
-      sampleAssets = [
-        {
-          id: 'dom-1',
-          assetTypeId: 'domains',
-          assetType: activeAssetType!,
-          title: 'دامنه اصلی شرکت (company.ir)',
-          tags: ['Production', 'برند اصلی'],
-          expiryDate: new Date(Date.now() + 320 * 86400000).toISOString(),
-          values: {
-            domain_name: 'company.ir',
-            registrar: 'ایران‌سرور / ایرنیک',
-            cost_amount: '650,000',
-            cost_currency: 'تومان',
-            billing_cycle: 'سالانه',
-            expiry_date: '۱۴۰۵/۰۶/۳۰',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'dom-2',
-          assetTypeId: 'domains',
-          assetType: activeAssetType!,
-          title: 'دامنه بین‌المللی برند (company.com)',
-          tags: ['بین‌المللی', 'برند'],
-          expiryDate: new Date(Date.now() + 14 * 86400000).toISOString(),
-          values: {
-            domain_name: 'company.com',
-            registrar: 'Namecheap',
-            cost_amount: '16',
-            cost_currency: 'دلار ($)',
-            billing_cycle: 'سالانه',
-            expiry_date: '۱۴۰۴/۱۱/۱۵',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-    } else if (typeId === 'licenses') {
-      sampleAssets = [
-        {
-          id: 'lic-1',
-          assetTypeId: 'licenses',
-          assetType: activeAssetType!,
-          title: 'لایسنس ابری JetBrains All Products',
-          tags: ['Cloud', 'توسعه'],
-          expiryDate: new Date(Date.now() + 190 * 86400000).toISOString(),
-          values: {
-            software_name: 'JetBrains Toolbox',
-            license_key: '••••••••',
-            vendor: 'JetBrains s.r.o.',
-            cost_amount: '290',
-            cost_currency: 'دلار ($)',
-            billing_cycle: 'سالانه',
-            expiry_date: '۱۴۰۵/۰۱/۲۰',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'lic-2',
-          assetTypeId: 'licenses',
-          assetType: activeAssetType!,
-          title: 'اشتراک سالانه GitKraken Pro',
-          tags: ['ابزار', 'توسعه'],
-          expiryDate: new Date(Date.now() - 2 * 86400000).toISOString(),
-          values: {
-            software_name: 'GitKraken Client',
-            license_key: '••••••••',
-            vendor: 'Axosoft',
-            cost_amount: '60',
-            cost_currency: 'دلار ($)',
-            billing_cycle: 'سالانه',
-            expiry_date: '۱۴۰۴/۱۰/۰۱',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-    }
-
+    const sampleAssets = getAllSampleAssets(assetTypes).filter((a) => a.assetTypeId === typeId);
     setAssets(sampleAssets);
     setIsAssetsLoading(false);
   };
@@ -664,6 +718,94 @@ function AppContent() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // جستجو و باز کردن مشخصات دارایی بر اساس شناسه یا بارکد (جهت اسکن، دیپ لینک و وابستگی‌ها)
+  const openAssetById = async (targetId: string) => {
+    let cleanId = targetId.trim();
+    if (cleanId.startsWith('DFT-')) {
+      cleanId = cleanId.replace(/^DFT-/, '');
+    }
+
+    // نگاشت نام‌های مستعار یا شناسه‌های قدیمی دمو
+    const ID_ALIASES: Record<string, string> = {
+      'demo-dom-1': 'dom-1',
+      'demo-vps-main': 'vps-1',
+      'demo-vps-1': 'vps-1',
+      'demo-em-1': 'em-1',
+    };
+    if (ID_ALIASES[cleanId]) {
+      cleanId = ID_ALIASES[cleanId];
+    }
+
+    // ۱. بررسی در دارایی‌های در حال حاضر لود شده در استیت
+    const foundInState = assets.find((a) => a.id.toLowerCase() === cleanId.toLowerCase());
+    if (foundInState) {
+      setActiveTab('assets');
+      setActiveTypeId(foundInState.assetTypeId);
+      setSelectedAsset(foundInState);
+      setIsDrawerOpen(true);
+      showToast(`شناسنامه دارایی «${foundInState.title}» باز شد.`, 'success');
+      return;
+    }
+
+    // ۲. بررسی در لیست کامل نمونه‌های سیستم (شامل دیتابیس PostgreSQL، سرورها، دامنه‌ها و...)
+    const allSamples = getAllSampleAssets(assetTypes);
+    const foundInSamples = allSamples.find((a) => a.id.toLowerCase() === cleanId.toLowerCase());
+    if (foundInSamples) {
+      setActiveTab('assets');
+      setActiveTypeId(foundInSamples.assetTypeId);
+      setSelectedAsset(foundInSamples);
+      setIsDrawerOpen(true);
+      showToast(`شناسنامه دارایی «${foundInSamples.title}» باز شد.`, 'success');
+      return;
+    }
+
+    // ۳. بررسی مستقیم از سرور API
+    try {
+      const apiAsset = await assetsService.getById(cleanId);
+      if (apiAsset && apiAsset.id) {
+        setActiveTab('assets');
+        if (apiAsset.assetTypeId) {
+          setActiveTypeId(apiAsset.assetTypeId);
+        }
+        setSelectedAsset(apiAsset);
+        setIsDrawerOpen(true);
+        showToast(`شناسنامه دارایی «${apiAsset.title}» باز شد.`, 'success');
+        return;
+      }
+    } catch {}
+
+    // ۴. بررسی در localStorage نمونه‌های محلی دمو
+    try {
+      const stored = localStorage.getItem('daftar_demo_assets');
+      if (stored) {
+        const list: Asset[] = JSON.parse(stored);
+        const inDemo = list.find((a) => a.id.toLowerCase() === cleanId.toLowerCase());
+        if (inDemo) {
+          setActiveTab('assets');
+          setActiveTypeId(inDemo.assetTypeId);
+          setSelectedAsset(inDemo);
+          setIsDrawerOpen(true);
+          showToast(`شناسنامه دارایی «${inDemo.title}» باز شد.`, 'success');
+          return;
+        }
+      }
+    } catch {}
+
+    showToast(`دارایی با بارکد یا شناسه «${cleanId}» یافت نشد.`, 'error');
+  };
+
+  // پشتیبانی از باز کردن مستقیم دارایی از طریق اسکن بارکد با دوربین موبایل و Deep Link (?assetId=... یا ?asset=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const assetParam = params.get('assetId') || params.get('asset');
+    if (assetParam) {
+      const timer = setTimeout(() => {
+        openAssetById(assetParam);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [assetTypes.length]);
 
 
   const handleCopy = (text: string, identifier: string, e: React.MouseEvent) => {
@@ -976,6 +1118,16 @@ function AppContent() {
 
           {/* نشانگرهای سررسید، تم، ابزارها و کاربر */}
           <div className="flex items-center gap-3">
+            {/* دکمه اسکن بارکد و QR اموال */}
+            <button
+              onClick={() => setIsQrScannerOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-border-strong text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-surface-2 text-xs font-semibold transition shadow-2xs"
+              title="اسکن بارکد و شناسنامه اموال فیزیکی"
+            >
+              <ScanLine className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden sm:inline">اسکن بارکد اموال</span>
+            </button>
+
             {/* دکمه ابزار سریع تولید رمز عبور */}
             <button
               onClick={() => setIsGlobalPassModalOpen(true)}
@@ -1107,9 +1259,8 @@ function AppContent() {
                     {/* دکمه‌های خروجی و ورود اکسل */}
                     <button
                       onClick={handleExportExcel}
-                      disabled={assets.length === 0}
-                      title={assets.length === 0 ? 'دارایی برای خروجی وجود ندارد' : 'دانلود خروجی اکسل از کلیه ردیف‌ها'}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-border-strong bg-white dark:bg-surface-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-surface-elevated hover:text-slate-900 dark:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition shadow-2xs"
+                      title="دانلود خروجی اکسل پیشرفته یا گزارش تحلیلی سازمانی"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-border-strong bg-white dark:bg-surface-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-surface-elevated hover:text-slate-900 dark:hover:text-white transition shadow-2xs"
                     >
                       <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>خروجی اکسل</span>
@@ -1454,6 +1605,43 @@ function AppContent() {
                                   );
                                 }
 
+                                if (field.type === 'email') {
+                                  return (
+                                    <td key={field.id} className={cellPadding}>
+                                      {val ? (
+                                        <div className="inline-flex items-center gap-1.5" dir="ltr">
+                                          {isCopyable && (
+                                            <button
+                                              onClick={(e) => handleCopy(String(val), cellId, e)}
+                                              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-surface-elevated text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition shrink-0"
+                                              title={`کپی ${field.label}`}
+                                            >
+                                              {copiedCellId === cellId ? (
+                                                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                              ) : (
+                                                <Copy className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+                                              )}
+                                            </button>
+                                          )}
+                                          <a
+                                            href={`mailto:${val}`}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className={`inline-flex items-center gap-1 text-indigo-600 dark:text-cyan-400 hover:underline font-mono ${
+                                              density === 'compact' ? 'text-[11px]' : 'text-xs'
+                                            }`}
+                                            title={`ارسال ایمیل به ${val}`}
+                                          >
+                                            <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            <span>{val}</span>
+                                          </a>
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400 dark:text-slate-600">—</span>
+                                      )}
+                                    </td>
+                                  );
+                                }
+
                                 if (field.type === 'jalali_date') {
                                   return (
                                     <td key={field.id} className={cellPadding}>
@@ -1599,23 +1787,7 @@ function AppContent() {
           assetType={activeAssetType}
           onClose={() => setIsDrawerOpen(false)}
           onSelectAsset={(targetId) => {
-            const found = assets.find((a) => a.id === targetId);
-            if (found) {
-              setSelectedAsset(found);
-            } else {
-              try {
-                const demoAssetsStr = localStorage.getItem('daftar_demo_assets');
-                if (demoAssetsStr) {
-                  const list: Asset[] = JSON.parse(demoAssetsStr);
-                  const inDemo = list.find((a) => a.id === targetId);
-                  if (inDemo) {
-                    setSelectedAsset(inDemo);
-                    const t = assetTypes.find((x) => x.id === inDemo.assetTypeId);
-                    if (t) setActiveTypeId(t.id);
-                  }
-                }
-              } catch {}
-            }
+            openAssetById(targetId);
           }}
           onSaved={(savedAsset) => {
             setAssets((prev) => {
@@ -1671,6 +1843,19 @@ function AppContent() {
         />
       )}
 
+      {/* مودال حرفه‌ای خروجی اکسل و گزارش‌های تحلیلی مدیریتی */}
+      {isExportModalOpen && (
+        <ExcelExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          activeAssetType={activeAssetType}
+          currentAssets={assets}
+          filteredAssets={filteredAssets}
+          assetTypes={assetTypes}
+          allOrgAssets={getAllSampleAssets(assetTypes)}
+        />
+      )}
+
       {/* پنجره فرمان جستجوی سراسری (Ctrl + K) */}
       <CommandPalette
         isOpen={isCommandPaletteOpen}
@@ -1689,6 +1874,15 @@ function AppContent() {
       <PasswordGeneratorModal
         isOpen={isGlobalPassModalOpen}
         onClose={() => setIsGlobalPassModalOpen(false)}
+      />
+
+      {/* مودال اسکنر بارکد و QR اموال */}
+      <AssetQrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={(scannedId) => {
+          openAssetById(scannedId);
+        }}
       />
     </div>
   );

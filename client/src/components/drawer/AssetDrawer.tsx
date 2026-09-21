@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, FileText, Settings, Paperclip, Copy, Check, Edit3, Eye, EyeOff, Tag, History, Network } from 'lucide-react';
+import { X, Save, Trash2, FileText, Settings, Paperclip, Copy, Check, Edit3, Eye, EyeOff, Tag, History, Network, QrCode, Mail } from 'lucide-react';
 import { Asset, assetsService } from '../../services/assets.service.ts';
+import { auditService } from '../../services/audit.service.ts';
 import { AssetType } from '../../services/asset-types.service.ts';
 import { DynamicForm } from '../forms/DynamicForm.tsx';
 import { AttachmentsManager } from '../common/AttachmentsManager.tsx';
@@ -9,6 +10,8 @@ import { TagBadge } from '../common/TagBadge.tsx';
 import { TagInput } from '../common/TagInput.tsx';
 import { AssetTimelineView } from './AssetTimelineView.tsx';
 import { AssetRelationsView } from './AssetRelationsView.tsx';
+import { AssetTagPrintModal } from '../common/AssetTagPrintModal.tsx';
+import { AssetDossierModal } from '../common/AssetDossierModal.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
 
 interface AssetDrawerProps {
@@ -38,6 +41,8 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
   const [copiedFieldKey, setCopiedFieldKey] = useState<string | null>(null);
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, string>>({});
   const [loadingSecretKey, setLoadingSecretKey] = useState<string | null>(null);
+  const [isPrintTagOpen, setIsPrintTagOpen] = useState(false);
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
 
   useEffect(() => {
     if (asset) {
@@ -66,6 +71,12 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
         await navigator.clipboard.writeText(revealedSecrets[fieldKey]);
         setCopiedFieldKey(fieldKey);
         showToast(`رمز عبور «${fieldLabel}» کپی شد.`, 'success');
+        await auditService.recordAudit({
+          action: 'COPY_SECRET',
+          targetEntity: 'Asset',
+          targetId: `${asset.title} (${asset.id})`,
+          diff: { field: fieldKey, fieldLabel, accessType: 'COPY', note: `کپی مستقیم فیلد محرمانه «${fieldLabel}» از مودال جزئیات` },
+        });
         setTimeout(() => setCopiedFieldKey(null), 1800);
         return;
       }
@@ -73,11 +84,17 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
       // در غیر این صورت مقدار را واکشی و کپی کن
       setLoadingSecretKey(fieldKey);
       try {
-        const res = await assetsService.revealSecret(asset.id, fieldKey);
+        const res = await assetsService.revealSecret(asset.id, fieldKey, 'COPY');
         setRevealedSecrets((prev) => ({ ...prev, [fieldKey]: res.value }));
         await navigator.clipboard.writeText(res.value);
         setCopiedFieldKey(fieldKey);
         showToast(`رمز عبور «${fieldLabel}» کپی شد.`, 'success');
+        await auditService.recordAudit({
+          action: 'COPY_SECRET',
+          targetEntity: 'Asset',
+          targetId: `${asset.title} (${asset.id})`,
+          diff: { field: fieldKey, fieldLabel, accessType: 'COPY', note: `کپی مستقیم فیلد محرمانه «${fieldLabel}» از مودال جزئیات` },
+        });
         setTimeout(() => setCopiedFieldKey(null), 1800);
       } catch {
         const fallbackSecrets: Record<string, string> = {
@@ -90,6 +107,12 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
         await navigator.clipboard.writeText(val);
         setCopiedFieldKey(fieldKey);
         showToast(`رمز عبور «${fieldLabel}» کپی شد.`, 'success');
+        await auditService.recordAudit({
+          action: 'COPY_SECRET',
+          targetEntity: 'Asset',
+          targetId: `${asset.title} (${asset.id})`,
+          diff: { field: fieldKey, fieldLabel, accessType: 'COPY', note: `کپی مستقیم فیلد محرمانه «${fieldLabel}» از مودال جزئیات (آفلاین)` },
+        });
         setTimeout(() => setCopiedFieldKey(null), 1800);
       } finally {
         setLoadingSecretKey(null);
@@ -124,8 +147,14 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
     if (!asset) return;
     setLoadingSecretKey(fieldKey);
     try {
-      const res = await assetsService.revealSecret(asset.id, fieldKey);
+      const res = await assetsService.revealSecret(asset.id, fieldKey, 'VIEW');
       setRevealedSecrets((prev) => ({ ...prev, [fieldKey]: res.value }));
+      await auditService.recordAudit({
+        action: 'READ_SECRET',
+        targetEntity: 'Asset',
+        targetId: `${asset.title} (${asset.id})`,
+        diff: { field: fieldKey, accessType: 'VIEW', note: 'آشکارسازی چشمی فیلد محرمانه در مودال مشخصات دارایی' },
+      });
     } catch {
       const fallbackSecrets: Record<string, string> = {
         root_password: 'P@ssw0rd!2026#Hetzner',
@@ -134,6 +163,12 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
       };
       const val = fallbackSecrets[fieldKey] || 'Secret@Pass2026';
       setRevealedSecrets((prev) => ({ ...prev, [fieldKey]: val }));
+      await auditService.recordAudit({
+        action: 'READ_SECRET',
+        targetEntity: 'Asset',
+        targetId: `${asset.title} (${asset.id})`,
+        diff: { field: fieldKey, accessType: 'VIEW', note: 'آشکارسازی چشمی فیلد محرمانه در مودال مشخصات دارایی (آفلاین)' },
+      });
     } finally {
       setLoadingSecretKey(null);
     }
@@ -271,6 +306,28 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {!isNew && asset && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsDossierOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-surface-2 dark:hover:bg-surface-3 dark:text-slate-200 font-semibold text-xs border border-slate-200 dark:border-border-strong transition shadow-2xs"
+                    title="چاپ شناسنامه رسمی سازمانی (A4 PDF)"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span className="hidden sm:inline">شناسنامه رسمی</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsPrintTagOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-surface-2 dark:hover:bg-surface-3 dark:text-slate-200 font-semibold text-xs border border-slate-200 dark:border-border-strong transition shadow-2xs"
+                    title="چاپ برچسب اموال و بارکد QR"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span className="hidden sm:inline">برچسب اموال</span>
+                  </button>
+                </>
+              )}
               {!isNew && !isEditing && (
                 <button
                   type="button"
@@ -399,8 +456,8 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
                             <span>کپی شد!</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition">
-                            <Copy className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition">
+                            <Copy className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
                             <span>کلیک برای کپی</span>
                           </span>
                         )}
@@ -483,8 +540,8 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
                                   <span>کپی شد!</span>
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition">
-                                  <Copy className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition">
+                                  <Copy className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
                                   <span>کلیک برای کپی</span>
                                 </span>
                               )}
@@ -509,6 +566,18 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
                                   <span className="font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-surface-2 text-slate-800 dark:text-indigo-300 border border-slate-200 dark:border-border-strong font-medium">
                                     {rawVal}
                                   </span>
+                                </div>
+                              ) : field.type === 'email' ? (
+                                <div dir="ltr" className="inline-flex items-center gap-1.5">
+                                  <a
+                                    href={`mailto:${rawVal}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-indigo-600 dark:text-cyan-400 hover:underline font-mono text-xs inline-flex items-center gap-1"
+                                    title={`ارسال ایمیل به ${rawVal}`}
+                                  >
+                                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span>{rawVal}</span>
+                                  </a>
                                 </div>
                               ) : field.type === 'jalali_date' ? (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 font-mono font-medium">
@@ -728,6 +797,24 @@ export function AssetDrawer({ asset, assetType, onClose, onSaved, onDeleted, onS
           </div>
         </div>
       </div>
+
+      {/* مودال چاپ برچسب اموال */}
+      {asset && (
+        <>
+          <AssetTagPrintModal
+            isOpen={isPrintTagOpen}
+            onClose={() => setIsPrintTagOpen(false)}
+            asset={asset}
+            assetType={assetType}
+          />
+          <AssetDossierModal
+            isOpen={isDossierOpen}
+            onClose={() => setIsDossierOpen(false)}
+            asset={asset}
+            assetType={assetType}
+          />
+        </>
+      )}
     </div>
   );
 }

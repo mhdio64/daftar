@@ -36,6 +36,9 @@ export function generateExcelTemplate(assetType: AssetTypeWithSchema): Buffer {
       case 'ip_port':
         sampleRow[colHeader] = '192.168.1.100:22';
         break;
+      case 'email':
+        sampleRow[colHeader] = 'user@company.ir';
+        break;
       case 'secret':
         sampleRow[colHeader] = 'P@ssw0rd123!';
         break;

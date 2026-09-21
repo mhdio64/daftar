@@ -252,23 +252,23 @@ export function AssetRelationsView({
           note: 'پورت 5432 - کانتینر postgres-prod',
           sourceAsset: {
             id: 'demo-db-1',
-            title: 'دیتابیس اصلی PostgreSQL',
-            assetTypeId: 'db',
-            assetTypeName: 'پایگاه‌های داده',
+            title: 'دیتابیس اصلی PostgreSQL (کانتینر داکر)',
+            assetTypeId: 'vps',
+            assetTypeName: 'سرورهای مجازی و دیتابیس',
             assetTypeIcon: 'Database',
-            assetTypeSlug: 'databases',
+            assetTypeSlug: 'vps',
           },
         });
         inbound.push({
           id: 'demo-rel-in-2',
-          sourceAssetId: 'demo-dom-1',
+          sourceAssetId: 'dom-1',
           targetAssetId: asset.id,
           type: 'POINTS_TO',
           note: 'DNS A Record -> 10.0.1.5',
           sourceAsset: {
-            id: 'demo-dom-1',
-            title: 'دامنه اصلی شرکت (daftar.io)',
-            assetTypeId: 'dom',
+            id: 'dom-1',
+            title: 'دامنه اصلی شرکت (company.ir)',
+            assetTypeId: 'domains',
             assetTypeName: 'دامنه‌ها و DNS',
             assetTypeIcon: 'Globe',
             assetTypeSlug: 'domains',
@@ -277,11 +277,11 @@ export function AssetRelationsView({
       } else {
         outbound.push({
           id: 'demo-rel-out-1',
-          targetAssetId: 'demo-vps-main',
+          targetAssetId: 'vps-1',
           type: 'HOSTED_ON',
           note: 'روی پورت 8080',
           targetAsset: {
-            id: 'demo-vps-main',
+            id: 'vps-1',
             title: 'سرور اصلی دیتاسنتر تهران',
             assetTypeId: 'vps',
             assetTypeName: 'سرورهای مجازی',

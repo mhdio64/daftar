@@ -47,12 +47,25 @@ export function calculateDiff(
   return diff;
 }
 
+export type AuditActionType =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'READ_SECRET'
+  | 'COPY_SECRET'
+  | 'LOGIN'
+  | 'LOGOUT'
+  | '2FA_ENABLE'
+  | '2FA_DISABLE'
+  | 'EXPORT_BACKUP'
+  | 'RESTORE_BACKUP';
+
 /**
  * ثبت لاگ یک عملیات در دیتابیس
  */
 export async function logAudit(data: {
   userId: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'READ_SECRET' | 'LOGIN' | 'LOGOUT' | 'EXPORT_BACKUP' | 'RESTORE_BACKUP';
+  action: AuditActionType;
   targetEntity: 'Asset' | 'AssetType' | 'User' | 'System' | 'Attachment';
   targetId: string;
   diff?: Record<string, any> | null;

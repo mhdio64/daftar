@@ -1,12 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../services/prisma.service.js';
-import { requireAuth, requireEditor } from '../middlewares/auth.middleware.js';
+import { requireAuth, requireEditor, canAccessCategory } from '../middlewares/auth.middleware.js';
 import { logAudit } from '../services/audit.service.js';
 
 export async function remindersRoutes(app: FastifyInstance) {
-  // دریافت لیست تمام دارایی‌های دارای سررسید به همراه برچسب وضعیت
-  app.get('/', { preHandler: [requireAuth] }, async () => {
+  // دریافت لیست تمام دارایی‌های دارای سررسید به همراه برچسب وضعیت با رعایت سطح دسترسی
+  app.get('/', { preHandler: [requireAuth] }, async (request) => {
+    const user = request.user!;
     const assets = await prisma.asset.findMany({
       where: {
         expiryDate: { not: null },
@@ -22,7 +23,9 @@ export async function remindersRoutes(app: FastifyInstance) {
     const now = new Date();
     const oneDay = 24 * 60 * 60 * 1000;
 
-    const categorized = assets.map((asset) => {
+    const filteredAssets = assets.filter((a) => canAccessCategory(user, a.assetTypeId));
+
+    const categorized = filteredAssets.map((asset) => {
       const expiry = new Date(asset.expiryDate!);
       const diffMs = expiry.getTime() - now.getTime();
       const diffDays = Math.ceil(diffMs / oneDay);
@@ -83,6 +86,10 @@ export async function remindersRoutes(app: FastifyInstance) {
     const asset = await prisma.asset.findUnique({ where: { id: assetId } });
     if (!asset) {
       return reply.status(404).send({ message: 'دارایی مورد نظر یافت نشد.' });
+    }
+
+    if (!canAccessCategory(request.user!, asset.assetTypeId)) {
+      return reply.status(403).send({ message: 'شما اجازه ثبت تمدید دوره برای دارایی‌های این دسته را ندارید.' });
     }
 
     const newExpiry = new Date(parsed.data.newExpiryDate);

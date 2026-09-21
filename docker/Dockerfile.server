@@ -9,7 +9,7 @@ RUN npm install -g pnpm
 COPY package.json pnpm-workspace.yaml ./
 COPY server/package.json ./server/
 
-RUN pnpm install --filter server --frozen-lockfile=false
+RUN pnpm install --filter daftar-server --frozen-lockfile=false
 
 # کپی سورس کد و پریزما
 COPY server ./server

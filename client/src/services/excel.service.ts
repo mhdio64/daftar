@@ -39,6 +39,9 @@ export function downloadExcelTemplate(assetType: AssetType): void {
       case 'ip_port':
         sampleRow[colName] = '192.168.1.100:22';
         break;
+      case 'email':
+        sampleRow[colName] = 'user@company.ir';
+        break;
       case 'secret':
         sampleRow[colName] = 'P@ssw0rd123!';
         break;
@@ -104,6 +107,209 @@ export function exportAssetsToExcel(assetType: AssetType, assets: Asset[]): void
     excelBuffer,
     `خروجی_${assetType.name.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('fa-IR').replace(/\//g, '-')}.xlsx`
   );
+}
+
+export interface ExcelExportOptions {
+  includeSecrets?: boolean;
+  includeTags?: boolean;
+  includeDates?: boolean;
+  customFilename?: string;
+  scopeLabel?: string;
+}
+
+/**
+ * ایجاد و دانلود فایل اکسل سفارشی از دارایی‌های مشخص‌شده (همه‌یا فیلترشده)
+ */
+export function exportCustomAssetsToExcel(
+  assetType: AssetType,
+  assets: Asset[],
+  options: ExcelExportOptions = {}
+): void {
+  const schema = assetType.schemaDefinition || [];
+  const headers: string[] = ['ردیف', 'کد اموال', 'عنوان دارایی'];
+  if (options.includeTags !== false) headers.push('برچسب‌ها');
+
+  for (const field of schema) {
+    headers.push(field.label);
+  }
+
+  if (options.includeDates !== false) {
+    headers.push('تاریخ ثبت');
+    headers.push('سررسید تمدید');
+  }
+
+  const rows = assets.map((asset, index) => {
+    const row: Record<string, any> = {
+      'ردیف': index + 1,
+      'کد اموال': `DFT-${asset.id}`,
+      'عنوان دارایی': asset.title,
+    };
+
+    if (options.includeTags !== false) {
+      row['برچسب‌ها'] = Array.isArray(asset.tags) && asset.tags.length > 0 ? asset.tags.join('، ') : '—';
+    }
+
+    for (const field of schema) {
+      const val = asset.values?.[field.name];
+      if (field.type === 'secret' && options.includeSecrets === false) {
+        row[field.label] = '••••••••';
+      } else {
+        row[field.label] = val !== undefined && val !== null && val !== '' ? val : '—';
+      }
+    }
+
+    if (options.includeDates !== false) {
+      row['تاریخ ثبت'] = new Date(asset.createdAt).toLocaleDateString('fa-IR');
+      const exp = asset.expiryDate || asset.values?.expiry_date;
+      row['سررسید تمدید'] = exp ? String(exp) : '—';
+    }
+
+    return row;
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+  ws['!cols'] = headers.map(() => ({ wch: 22 }));
+
+  const wb = XLSX.utils.book_new();
+  const safeSheetName = (assetType.name || 'دارایی‌ها').slice(0, 31).replace(/[\\/?*[\]]/g, '_');
+  XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+
+  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const filename = options.customFilename || `گزارش_${assetType.name.replace(/\s+/g, '_')}_${options.scopeLabel ? options.scopeLabel + '_' : ''}${new Date().toLocaleDateString('fa-IR').replace(/\//g, '-')}.xlsx`;
+  triggerBrowserDownload(excelBuffer, filename);
+}
+
+/**
+ * ایجاد و صدور کتابچه جامع اکسل چند شیتی (Multi-Sheet Comprehensive Workbook)
+ * ویژه ارائه به امور مالی، حسابداری و مدیران ارشد
+ */
+export function exportComprehensiveFinancialExcel(
+  assetTypes: AssetType[],
+  allAssets: Asset[],
+  options: ExcelExportOptions = {}
+): void {
+  const wb = XLSX.utils.book_new();
+
+  // ۱. شیت خلاصه مدیریتی و مالی (Executive & Financial Summary)
+  const summaryRows: Record<string, any>[] = [];
+
+  assetTypes.forEach((type, idx) => {
+    const typeAssets = allAssets.filter((a) => a.assetTypeId === type.id);
+    let totalMonthlyToman = 0;
+    let totalMonthlyDollar = 0;
+    let totalMonthlyEuro = 0;
+    let expiringCount = 0;
+
+    typeAssets.forEach((a) => {
+      const costAmountStr = String(a.values?.cost_amount || '').replace(/,/g, '').trim();
+      const num = parseFloat(costAmountStr);
+      const curr = String(a.values?.cost_currency || '').trim();
+      const cycle = String(a.values?.billing_cycle || 'ماهانه').trim();
+      const monthlyRate = cycle === 'سالانه' ? (num ? num / 12 : 0) : (num || 0);
+
+      if (!isNaN(num) && num > 0) {
+        if (curr.includes('دلار') || curr.includes('$')) {
+          totalMonthlyDollar += monthlyRate;
+        } else if (curr.includes('یورو') || curr.includes('€')) {
+          totalMonthlyEuro += monthlyRate;
+        } else {
+          totalMonthlyToman += monthlyRate;
+        }
+      }
+
+      if (a.expiryDate || a.values?.expiry_date) {
+        expiringCount++;
+      }
+    });
+
+    summaryRows.push({
+      'ردیف': idx + 1,
+      'دسته دارایی': type.name,
+      'تعداد دارایی‌های ثبت‌شده': typeAssets.length,
+      'تخمین هزینه ماهانه (تومان)': totalMonthlyToman > 0 ? Math.round(totalMonthlyToman).toLocaleString('fa-IR') : '—',
+      'تخمین هزینه سالانه (تومان)': totalMonthlyToman > 0 ? Math.round(totalMonthlyToman * 12).toLocaleString('fa-IR') : '—',
+      'هزینه ارزی ماهانه (ارز)': [
+        totalMonthlyDollar > 0 ? `${Math.round(totalMonthlyDollar)} $` : '',
+        totalMonthlyEuro > 0 ? `${Math.round(totalMonthlyEuro)} €` : '',
+      ].filter(Boolean).join(' + ') || '—',
+      'اقلام با تاریخ سررسید': expiringCount,
+    });
+  });
+
+  const summaryHeaders = [
+    'ردیف',
+    'دسته دارایی',
+    'تعداد دارایی‌های ثبت‌شده',
+    'تخمین هزینه ماهانه (تومان)',
+    'تخمین هزینه سالانه (تومان)',
+    'هزینه ارزی ماهانه (ارز)',
+    'اقلام با تاریخ سررسید',
+  ];
+  const summaryWs = XLSX.utils.json_to_sheet(summaryRows, { header: summaryHeaders });
+  summaryWs['!cols'] = [
+    { wch: 8 },
+    { wch: 25 },
+    { wch: 22 },
+    { wch: 25 },
+    { wch: 25 },
+    { wch: 22 },
+    { wch: 20 },
+  ];
+  XLSX.utils.book_append_sheet(wb, summaryWs, 'خلاصه مالی و مدیریتی');
+
+  // ۲. شیت‌های تفکیکی هر دسته‌بندی
+  assetTypes.forEach((type) => {
+    const typeAssets = allAssets.filter((a) => a.assetTypeId === type.id);
+    const schema = type.schemaDefinition || [];
+    const headers: string[] = ['ردیف', 'کد اموال', 'عنوان دارایی'];
+    if (options.includeTags !== false) headers.push('برچسب‌ها');
+    for (const field of schema) {
+      headers.push(field.label);
+    }
+    if (options.includeDates !== false) {
+      headers.push('تاریخ ثبت');
+      headers.push('سررسید تمدید');
+    }
+
+    const rows = typeAssets.map((asset, index) => {
+      const row: Record<string, any> = {
+        'ردیف': index + 1,
+        'کد اموال': `DFT-${asset.id}`,
+        'عنوان دارایی': asset.title,
+      };
+
+      if (options.includeTags !== false) {
+        row['برچسب‌ها'] = Array.isArray(asset.tags) && asset.tags.length > 0 ? asset.tags.join('، ') : '—';
+      }
+
+      for (const field of schema) {
+        const val = asset.values?.[field.name];
+        if (field.type === 'secret' && options.includeSecrets === false) {
+          row[field.label] = '••••••••';
+        } else {
+          row[field.label] = val !== undefined && val !== null && val !== '' ? val : '—';
+        }
+      }
+
+      if (options.includeDates !== false) {
+        row['تاریخ ثبت'] = new Date(asset.createdAt).toLocaleDateString('fa-IR');
+        const exp = asset.expiryDate || asset.values?.expiry_date;
+        row['سررسید تمدید'] = exp ? String(exp) : '—';
+      }
+
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+    ws['!cols'] = headers.map(() => ({ wch: 22 }));
+
+    const safeName = type.name.slice(0, 30).replace(/[\\/?*[\]]/g, '_');
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
+  });
+
+  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const filename = `گزارش_جامع_مالی_اموال_سازمان_${new Date().toLocaleDateString('fa-IR').replace(/\//g, '-')}.xlsx`;
+  triggerBrowserDownload(excelBuffer, filename);
 }
 
 /**

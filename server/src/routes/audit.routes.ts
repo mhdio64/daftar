@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
 import { prisma } from '../services/prisma.service.js';
-import { requireAdmin } from '../middlewares/auth.middleware.js';
+import { requireAdmin, requireAuth } from '../middlewares/auth.middleware.js';
+import { logAudit } from '../services/audit.service.js';
 
 export async function auditRoutes(app: FastifyInstance) {
   // مشاهده آمار کلیدی و شاخص‌های امنیتی لاگ‌ها (مخصوص مدیر ارشد)
@@ -12,10 +14,10 @@ export async function auditRoutes(app: FastifyInstance) {
 
     const [totalEvents, secretViews, recentSecretViews, todayChanges, loginEvents] = await Promise.all([
       prisma.auditLog.count(),
-      prisma.auditLog.count({ where: { action: 'READ_SECRET' } }),
+      prisma.auditLog.count({ where: { action: { in: ['READ_SECRET', 'COPY_SECRET'] } } }),
       prisma.auditLog.count({
         where: {
-          action: 'READ_SECRET',
+          action: { in: ['READ_SECRET', 'COPY_SECRET'] },
           createdAt: { gte: oneDayAgo },
         },
       }),
@@ -63,11 +65,16 @@ export async function auditRoutes(app: FastifyInstance) {
 
     const actionLabels: Record<string, string> = {
       CREATE: 'ثبت جدید',
-      UPDATE: 'ویرایش',
-      DELETE: 'حذف',
-      READ_SECRET: 'مشاهده رمز محرمانه',
+      UPDATE: 'ویرایش اطلاعات',
+      DELETE: 'حذف اطلاعات',
+      READ_SECRET: 'مشاهده رمز محرمانه (چشمی)',
+      COPY_SECRET: 'کپی مستقیم رمز محرمانه',
       LOGIN: 'ورود به سامانه',
       LOGOUT: 'خروج از سامانه',
+      '2FA_ENABLE': 'فعال‌سازی تایید دو مرحله‌ای (2FA)',
+      '2FA_DISABLE': 'غیرفعال‌سازی تایید دو مرحله‌ای (2FA)',
+      EXPORT_BACKUP: 'خروجی فایل پشتیبان',
+      RESTORE_BACKUP: 'بازیابی فایل پشتیبان',
     };
 
     const rows = logs.map((log, index) => ({
@@ -173,5 +180,36 @@ export async function auditRoutes(app: FastifyInstance) {
         totalPages: Math.ceil(total / limit),
       },
     };
+  });
+
+  // ثبت رخداد ممیزی از سمت کلاینت (برای دسترسی‌های چشمی، کپی و رویدادهای کاربر)
+  app.post('/', { preHandler: [requireAuth] }, async (request, reply) => {
+    const schema = z.object({
+      action: z.string().min(1),
+      targetEntity: z.string().min(1),
+      targetId: z.string().min(1),
+      diff: z.any().optional(),
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ statusCode: 400, message: parsed.error.errors[0].message });
+    }
+
+    try {
+      const log = await logAudit({
+        userId: request.user!.id,
+        action: parsed.data.action as any,
+        targetEntity: parsed.data.targetEntity as any,
+        targetId: parsed.data.targetId,
+        diff: parsed.data.diff,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return { success: true, log };
+    } catch (err: any) {
+      return reply.status(400).send({ statusCode: 400, message: err.message });
+    }
   });
 }

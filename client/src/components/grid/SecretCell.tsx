@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { assetsService } from '../../services/assets.service.ts';
+import { auditService } from '../../services/audit.service.ts';
 import { useToast } from '../../context/ToastContext.tsx';
 
 interface SecretCellProps {
@@ -66,9 +67,15 @@ export function SecretCell({ assetId, fieldKey }: SecretCellProps) {
 
     setIsLoading(true);
     try {
-      const res = await assetsService.revealSecret(assetId, fieldKey);
+      const res = await assetsService.revealSecret(assetId, fieldKey, 'VIEW');
       setSecretValue(res.value);
       setIsRevealed(true);
+      await auditService.recordAudit({
+        action: 'READ_SECRET',
+        targetEntity: 'Asset',
+        targetId: assetId,
+        diff: { field: fieldKey, accessType: 'VIEW', note: 'آشکارسازی چشمی مقدار محرمانه در جدول داده‌ها' },
+      });
     } catch (err: any) {
       console.warn('API reveal secret unreachable, falling back to demo secret:', err);
       const fallbackSecrets: Record<string, string> = {
@@ -79,6 +86,12 @@ export function SecretCell({ assetId, fieldKey }: SecretCellProps) {
       const val = fallbackSecrets[fieldKey] || 'Secret@Pass2026';
       setSecretValue(val);
       setIsRevealed(true);
+      await auditService.recordAudit({
+        action: 'READ_SECRET',
+        targetEntity: 'Asset',
+        targetId: assetId,
+        diff: { field: fieldKey, accessType: 'VIEW', note: 'آشکارسازی چشمی مقدار محرمانه در جدول داده‌ها (حالت آفلاین)' },
+      });
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +105,7 @@ export function SecretCell({ assetId, fieldKey }: SecretCellProps) {
       let valueToCopy = secretValue;
       if (!valueToCopy) {
         try {
-          const res = await assetsService.revealSecret(assetId, fieldKey);
+          const res = await assetsService.revealSecret(assetId, fieldKey, 'COPY');
           valueToCopy = res.value;
         } catch {
           const fallbackSecrets: Record<string, string> = {
@@ -107,6 +120,13 @@ export function SecretCell({ assetId, fieldKey }: SecretCellProps) {
       await navigator.clipboard.writeText(valueToCopy || '');
       setCopied(true);
       showToast('رمز عبور با موفقیت کپی شد.', 'success');
+
+      await auditService.recordAudit({
+        action: 'COPY_SECRET',
+        targetEntity: 'Asset',
+        targetId: assetId,
+        diff: { field: fieldKey, accessType: 'COPY', note: 'کپی مستقیم مقدار محرمانه به کلیپ‌بورد' },
+      });
 
       setTimeout(() => {
         setCopied(false);

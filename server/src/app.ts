@@ -2,8 +2,11 @@ import fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyJwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import { env } from './config/env.js';
 import { connectDatabase } from './services/prisma.service.js';
+import { notificationWorkerService } from './services/notification-worker.service.js';
 
 // ایمپورت مسیرها
 import { authRoutes } from './routes/auth.routes.js';
@@ -24,20 +27,54 @@ export async function buildApp() {
   });
 
   // ثبت پلاگین‌های اصلی
+  // ثبت پلاگین‌های اصلی با سیاست امنیتی CORS
   await app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      // مجاز بودن درخواست‌های داخلی یا محیط لوکال‌هاست
+      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        cb(null, true);
+        return;
+      }
+      // دامنه‌های مجاز سفارشی از فایل محیطی
+      const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()) || [];
+      if (allowedOrigins.includes(origin)) {
+        cb(null, true);
+        return;
+      }
+      cb(new Error('دسترسی امنیتی CORS: مبدا درخواست غیرمجاز است.'), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   });
 
   await app.register(fastifyJwt, {
     secret: env.jwtSecret,
+    sign: {
+      expiresIn: '8h',
+    },
   });
 
   await app.register(multipart, {
     limits: {
       fileSize: env.maxFileSizeBytes,
     },
+  });
+
+  // هدرهای امنیتی استاندارد OWASP (ضد کلیک‌جکینگ، ضد Sniffing)
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  });
+
+  // کنترل نرخ درخواست‌ها جهت مهار حملات Brute-force و DoS
+  await app.register(rateLimit, {
+    max: 300,
+    timeWindow: '1 minute',
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'تعداد درخواست‌های ارسالی بیش از حد مجاز است. لطفاً کمی صبر کرده و مجدداً تلاش کنید.',
+    }),
   });
 
   // مسیرهای بررسی سلامت
@@ -69,6 +106,7 @@ if (process.env.NODE_ENV !== 'test') {
   buildApp()
     .then(async (app) => {
       await connectDatabase();
+      notificationWorkerService.init();
       app.listen({ port: env.port, host: '0.0.0.0' }, (err, address) => {
         if (err) {
           app.log.error(err);

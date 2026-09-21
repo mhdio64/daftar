@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sliders, 
   Bell, 
@@ -28,15 +28,25 @@ import {
   Database,
   Download,
   Upload,
-  FileArchive
+  FileArchive,
+  Smartphone,
+  ShieldCheck,
+  X,
+  Copy,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
-import { alertingService } from '../../services/alerting.service.ts';
+import { useAuth } from '../../context/AuthContext.tsx';
+import { alertingService, NotificationLogItem } from '../../services/alerting.service.ts';
 import { remindersService } from '../../services/reminders.service.ts';
 import { backupService, BackupInspectResult } from '../../services/backup.service.ts';
+import { authService } from '../../services/auth.service.ts';
+import { auditService } from '../../services/audit.service.ts';
 import { AssetType } from '../../services/asset-types.service.ts';
 import { Asset } from '../../services/assets.service.ts';
+import { TwoFactorSetupModal } from './TwoFactorSetupModal.tsx';
 
 interface SettingsViewProps {
   onDataRestored?: () => void;
@@ -52,6 +62,56 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
   const [isDispatchingAll, setIsDispatchingAll] = useState(false);
   const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
+
+  // استیت‌های اتوماسیون هشدارها و کرون‌جاب
+  const [isTestingDigest, setIsTestingDigest] = useState(false);
+  const [isTriggeringWorker, setIsTriggeringWorker] = useState(false);
+  const [alertLogs, setAlertLogs] = useState<NotificationLogItem[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
+  const loadAlertLogs = async () => {
+    setIsLoadingLogs(true);
+    try {
+      const logs = await alertingService.getAlertLogs();
+      setAlertLogs(logs);
+    } catch {
+      // ignore
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeCategory === 'alerts') {
+      loadAlertLogs();
+    }
+  }, [activeCategory]);
+
+  const handleTriggerServerCheck = async () => {
+    setIsTriggeringWorker(true);
+    try {
+      const res = await alertingService.triggerServerCheck();
+      showToast(res.message || 'بررسی سررسیدها با موفقیت اجرا شد.', 'success');
+      loadAlertLogs();
+    } catch (err: any) {
+      showToast(err.message || 'خطا در بررسی سررسیدها', 'error');
+    } finally {
+      setIsTriggeringWorker(false);
+    }
+  };
+
+  const handleTriggerServerDigest = async () => {
+    setIsTestingDigest(true);
+    try {
+      const res = await alertingService.triggerServerDigest();
+      showToast(res.message || 'گزارش خلاصه وضعیت با موفقیت ارسال شد.', 'success');
+      loadAlertLogs();
+    } catch (err: any) {
+      showToast(err.message || 'خطا در ارسال خلاصه وضعیت', 'error');
+    } finally {
+      setIsTestingDigest(false);
+    }
+  };
 
   // استیت‌های پشتیبان‌گیری
   const [isExporting, setIsExporting] = useState(false);
@@ -70,8 +130,94 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
   const [isRestoring, setIsRestoring] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
+  // استیت‌های احراز هویت دومرحله‌ای
+  const { user, updateCurrentUser } = useAuth();
+  const [is2FASetupModalOpen, setIs2FASetupModalOpen] = useState(false);
+  const [isDisable2FAModalOpen, setIsDisable2FAModalOpen] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+  const [isRegeneratingCodes, setIsRegeneratingCodes] = useState(false);
+  const [shownRecoveryCodes, setShownRecoveryCodes] = useState<string[] | null>(null);
+
   const toggleShowToken = (key: string) => {
     setShowTokens((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // غیرفعال‌سازی 2FA
+  const handleDisable2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsDisabling2FA(true);
+
+    try {
+      await authService.disable2FA(disablePassword);
+      if (user) {
+        updateCurrentUser({ ...user, twoFactorEnabled: false });
+      }
+      setIsDisable2FAModalOpen(false);
+      setDisablePassword('');
+      await auditService.recordAudit({
+        action: '2FA_DISABLE',
+        targetEntity: 'User',
+        targetId: user?.username || 'admin',
+        diff: { note: 'غیرفعال‌سازی تایید دو مرحله‌ای توسط کاربر' },
+      });
+      showToast('احراز هویت دو مرحله‌ای با موفقیت غیرفعال شد.', 'info');
+    } catch {
+      // فال‌بک حالت دمو
+      localStorage.removeItem('daftar_demo_2fa_enabled');
+      localStorage.removeItem('daftar_demo_2fa_secret');
+      localStorage.removeItem('daftar_demo_2fa_recovery_codes');
+      if (user) {
+        updateCurrentUser({ ...user, twoFactorEnabled: false });
+      }
+      setIsDisable2FAModalOpen(false);
+      setDisablePassword('');
+      await auditService.recordAudit({
+        action: '2FA_DISABLE',
+        targetEntity: 'User',
+        targetId: user?.username || 'admin',
+        diff: { note: 'غیرفعال‌سازی تایید دو مرحله‌ای (حالت آفلاین)' },
+      });
+      showToast('احراز هویت دو مرحله‌ای غیرفعال شد.', 'info');
+    } finally {
+      setIsDisabling2FA(false);
+    }
+  };
+
+  // تولید مجدد کدهای بازیابی اضطراری
+  const handleRegenerateRecoveryCodes = async () => {
+    if (!window.confirm('آیا مایل به ابطال کدهای قبلی و صدور ۸ کد بازیابی اضطراری جدید هستید؟')) {
+      return;
+    }
+
+    setIsRegeneratingCodes(true);
+
+    try {
+      const res = await authService.regenerateRecoveryCodes();
+      setShownRecoveryCodes(res.recoveryCodes);
+      await auditService.recordAudit({
+        action: 'UPDATE',
+        targetEntity: 'User',
+        targetId: user?.username || 'admin',
+        diff: { action: 'REGENERATE_RECOVERY_CODES', count: res.recoveryCodes.length, note: 'تولید مجدد کدهای بازیابی اضطراری' },
+      });
+      showToast('کدهای بازیابی اضطراری جدید صادر شدند.', 'success');
+    } catch {
+      // فال‌بک دمو
+      const { generateRecoveryCodesClient } = await import('../../services/totp-client.service.ts');
+      const codes = generateRecoveryCodesClient(8);
+      localStorage.setItem('daftar_demo_2fa_recovery_codes', JSON.stringify(codes));
+      setShownRecoveryCodes(codes);
+      await auditService.recordAudit({
+        action: 'UPDATE',
+        targetEntity: 'User',
+        targetId: user?.username || 'admin',
+        diff: { action: 'REGENERATE_RECOVERY_CODES', count: codes.length, note: 'تولید مجدد کدهای بازیابی اضطراری (حالت آفلاین)' },
+      });
+      showToast('کدهای بازیابی اضطراری جدید صادر شدند.', 'success');
+    } finally {
+      setIsRegeneratingCodes(false);
+    }
   };
 
   const handleReset = () => {
@@ -82,11 +228,12 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
   };
 
   // ارسال پیام تست به کانال مشخص
-  const handleTestChannel = async (channel: 'telegram' | 'bale' | 'webhook' | 'email') => {
+  const handleTestChannel = async (channel: 'telegram' | 'discord' | 'bale' | 'webhook' | 'email' | 'sms') => {
     setTestingChannel(channel);
     try {
       const res = await alertingService.testChannel(channel, settings.alerts);
       showToast(res.message, 'success');
+      loadAlertLogs();
     } catch (err: any) {
       showToast(err.message || 'خطا در ارسال پیام تست', 'error');
     } finally {
@@ -129,6 +276,18 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
         includeUsers,
         assetTypes,
         assets,
+      });
+      await auditService.recordAudit({
+        action: 'EXPORT_BACKUP',
+        targetEntity: 'System',
+        targetId: res.filename,
+        diff: {
+          filename: res.filename,
+          assetTypesCount: res.stats.assetTypesCount,
+          assetsCount: res.stats.assetsCount,
+          isEncrypted: Boolean(exportPassword),
+          note: 'تهیه و دانلود فایل پشتیبان کامل سامانه',
+        },
       });
       showToast(`فایل پشتیبان «${res.filename}» (${res.stats.assetTypesCount} دسته‌بندی و ${res.stats.assetsCount} دارایی) با موفقیت دانلود شد.`, 'success');
       setExportPassword('');
@@ -200,6 +359,17 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
     setIsRestoring(true);
     try {
       const res = await backupService.applyRestore(inspectResult.bundle, { mode: restoreMode });
+      await auditService.recordAudit({
+        action: 'RESTORE_BACKUP',
+        targetEntity: 'System',
+        targetId: selectedFile?.name || 'فایل پشتیبان',
+        diff: {
+          mode: restoreMode,
+          assetTypesCount: inspectResult.stats?.assetTypesCount,
+          assetsCount: inspectResult.stats?.assetsCount,
+          note: 'بازیابی موفق اطلاعات از فایل پشتیبان',
+        },
+      });
       showToast(res.message, 'success');
       setIsConfirmModalOpen(false);
       setSelectedFile(null);
@@ -399,55 +569,228 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
                 </div>
               </div>
 
-              {/* نوار تنظیم روزهای سررسید و تست سراسری */}
+              {/* پنل‌های تنظیمات پیشرفته اتوماسیون هوشمند و خلاصه وضعیت */}
               {settings.alerts.enableAlerts && (
-                <div className="mt-5 pt-4 border-t border-indigo-100 dark:border-indigo-900/30 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">ارسال اخطار در بازه‌های:</span>
-                    {[
-                      { days: 7, label: '۷ روز قبل' },
-                      { days: 3, label: '۳ روز قبل' },
-                      { days: 1, label: '۱ روز قبل' },
-                      { days: 0, label: 'روز سررسید' },
-                    ].map((item) => {
-                      const isSelected = settings.alerts.alertDaysBefore.includes(item.days);
-                      return (
+                <div className="mt-5 pt-4 border-t border-indigo-100 dark:border-indigo-900/30 space-y-4">
+                  {/* ردیف ۱: اتوماسیون خودکار سرور و کرون‌جاب (Automated Expiration Worker) */}
+                  <div className="p-4 rounded-xl bg-white dark:bg-surface-2 border border-indigo-100 dark:border-border-strong space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+                          <Clock className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">
+                              ورکر خودکار بررسی سررسیدها (Notification Worker & Cron)
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              settings.alerts.cronEnabled
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'bg-slate-100 text-slate-500 dark:bg-surface-1 dark:text-slate-400'
+                            }`}>
+                              {settings.alerts.cronEnabled ? 'کرون فعال است' : 'کرون غیرفعال'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            بررسی خودکار موعد سررسید دارایی‌ها در پس‌زمینه سرور و ارسال اعلان حتی بدون باز بودن مرورگر
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
                         <button
-                          key={item.days}
                           type="button"
+                          role="switch"
+                          aria-checked={settings.alerts.cronEnabled}
                           onClick={() => {
-                            const current = settings.alerts.alertDaysBefore;
-                            const next = isSelected 
-                              ? current.filter((d) => d !== item.days) 
-                              : [...current, item.days].sort((a, b) => b - a);
+                            const newVal = !settings.alerts.cronEnabled;
                             updateSettings({
-                              alerts: {
-                                ...settings.alerts,
-                                alertDaysBefore: next,
-                              },
+                              alerts: { ...settings.alerts, cronEnabled: newVal },
                             });
+                            showToast(newVal ? 'ورکر خودکار سررسیدها فعال شد.' : 'ورکر خودکار سررسیدها خاموش شد.', 'info');
                           }}
-                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-white dark:bg-surface-1 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-border-strong hover:bg-slate-100'
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            settings.alerts.cronEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
                           }`}
                         >
-                          {item.label}
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                              settings.alerts.cronEnabled ? '-translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
                         </button>
-                      );
-                    })}
+
+                        <button
+                          type="button"
+                          disabled={isTriggeringWorker}
+                          onClick={handleTriggerServerCheck}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/40 dark:text-indigo-300 text-xs font-semibold border border-indigo-200 dark:border-indigo-800/40 transition shadow-2xs disabled:opacity-50"
+                          title="اجرای دستی و تست بررسی فوری انقضاها"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isTriggeringWorker ? 'animate-spin' : ''}`} />
+                          <span>{isTriggeringWorker ? 'در حال اجرا...' : 'اجرای دستی بررسی'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* زمان‌بندی و بازه‌های هشدار */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">بازه‌های هشدار:</span>
+                        {[
+                          { days: 30, label: '۳۰ روز قبل' },
+                          { days: 7, label: '۷ روز قبل' },
+                          { days: 1, label: '۲۴ ساعت قبل' },
+                          { days: 0, label: 'روز سررسید' },
+                        ].map((item) => {
+                          const isSelected = settings.alerts.alertDaysBefore.includes(item.days);
+                          return (
+                            <button
+                              key={item.days}
+                              type="button"
+                              onClick={() => {
+                                const current = settings.alerts.alertDaysBefore;
+                                const next = isSelected 
+                                  ? current.filter((d) => d !== item.days) 
+                                  : [...current, item.days].sort((a, b) => b - a);
+                                updateSettings({
+                                  alerts: {
+                                    ...settings.alerts,
+                                    alertDaysBefore: next,
+                                  },
+                                });
+                              }}
+                              className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
+                                isSelected
+                                  ? 'bg-indigo-600 text-white border-indigo-600'
+                                  : 'bg-white dark:bg-surface-1 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-border-strong hover:bg-slate-100'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-2 justify-start md:justify-end">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">ساعت اجرای روزانه:</span>
+                        <input
+                          type="time"
+                          value={settings.alerts.cronTime || '09:00'}
+                          onChange={(e) => {
+                            updateSettings({
+                              alerts: { ...settings.alerts, cronTime: e.target.value },
+                            });
+                          }}
+                          className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={isDispatchingAll}
-                    onClick={handleDispatchDueReminders}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs self-start md:self-auto disabled:opacity-50"
-                  >
-                    <Send className={`w-3.5 h-3.5 ${isDispatchingAll ? 'animate-spin' : ''}`} />
-                    <span>{isDispatchingAll ? 'در حال ارسال...' : 'توزیع فوری هشدارهای سررسید'}</span>
-                  </button>
+                  {/* ردیف ۲: گزارش خلاصه وضعیت دوره‌ای (Daily / Weekly Digest) */}
+                  <div className="p-4 rounded-xl bg-white dark:bg-surface-2 border border-indigo-100 dark:border-border-strong space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">
+                              گزارش خلاصه دوره‌ای وضعیت (Weekly / Daily Digest)
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              settings.alerts.digestEnabled
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300'
+                                : 'bg-slate-100 text-slate-500 dark:bg-surface-1 dark:text-slate-400'
+                            }`}>
+                              {settings.alerts.digestEnabled ? 'ارسال دایجست فعال است' : 'دایجست خاموش'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            ارسال یک گزارش جمع‌بندی زیبا شامل کل دارایی‌های فعال، هزینه‌های ماهانه و هشدارهای این هفته به کانال‌های تیم فنی
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={settings.alerts.digestEnabled}
+                          onClick={() => {
+                            const newVal = !settings.alerts.digestEnabled;
+                            updateSettings({
+                              alerts: { ...settings.alerts, digestEnabled: newVal },
+                            });
+                            showToast(newVal ? 'ارسال خلاصه وضعیت فعال شد.' : 'ارسال خلاصه وضعیت خاموش شد.', 'info');
+                          }}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            settings.alerts.digestEnabled ? 'bg-purple-600' : 'bg-slate-300 dark:bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                              settings.alerts.digestEnabled ? '-translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isTestingDigest}
+                          onClick={handleTriggerServerDigest}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 dark:text-purple-300 text-xs font-semibold border border-purple-200 dark:border-purple-800/40 transition shadow-2xs disabled:opacity-50"
+                          title="ارسال فوری و آزمایشی گزارش خلاصه وضعیت به کانال‌ها"
+                        >
+                          <Send className={`w-3.5 h-3.5 ${isTestingDigest ? 'animate-spin' : ''}`} />
+                          <span>{isTestingDigest ? 'در حال ارسال...' : 'ارسال فوری خلاصه وضعیت (تست Digest)'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">تناوب ارسال گزارش:</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => updateSettings({ alerts: { ...settings.alerts, digestFrequency: 'weekly' } })}
+                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
+                              settings.alerts.digestFrequency === 'weekly'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                : 'bg-white dark:bg-surface-1 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-border-strong hover:bg-slate-100'
+                            }`}
+                          >
+                            هفتگی (شنبه‌ها ساعت ۰۹:۰۰ صبح)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateSettings({ alerts: { ...settings.alerts, digestFrequency: 'daily' } })}
+                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
+                              settings.alerts.digestFrequency === 'daily'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                : 'bg-white dark:bg-surface-1 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-border-strong hover:bg-slate-100'
+                            }`}
+                          >
+                            روزانه (هر روز صبح)
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isDispatchingAll}
+                        onClick={handleDispatchDueReminders}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs self-start md:self-auto disabled:opacity-50"
+                      >
+                        <Send className={`w-3.5 h-3.5 ${isDispatchingAll ? 'animate-spin' : ''}`} />
+                        <span>{isDispatchingAll ? 'در حال ارسال...' : 'توزیع فوری تمام سررسیدها'}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -589,7 +932,119 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
                 </div>
               </div>
 
-              {/* ۲. کانال پیام‌رسان بله */}
+              {/* ۲. کانال دیسکورد (Discord Webhook) */}
+              <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="space-y-4">
+                  {/* هدر کارت دیسکورد */}
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-border-subtle">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                        <MessageSquare className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">دیسکورد (Discord Webhook)</h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">ارسال هشدار با قالب رنگی و Rich Embed به چنل دیسکورد</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.alerts.discord?.enabled}
+                      onClick={() => {
+                        updateSettings({
+                          alerts: {
+                            ...settings.alerts,
+                            discord: {
+                              ...(settings.alerts.discord || { webhookUrl: '', username: 'سامانه دفتر' }),
+                              enabled: !settings.alerts.discord?.enabled,
+                            },
+                          },
+                        });
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.alerts.discord?.enabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          settings.alerts.discord?.enabled ? '-translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* فیلدهای ورودی دیسکورد */}
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          آدرس وب‌هوک دیسکورد (Webhook URL):
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleShowToken('discord_url')}
+                          className="text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center gap-1"
+                        >
+                          {showTokens['discord_url'] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          <span>{showTokens['discord_url'] ? 'مخفی' : 'نمایش'}</span>
+                        </button>
+                      </div>
+                      <input
+                        type={showTokens['discord_url'] ? 'text' : 'password'}
+                        value={settings.alerts.discord?.webhookUrl || ''}
+                        onChange={(e) => {
+                          updateSettings({
+                            alerts: {
+                              ...settings.alerts,
+                              discord: { ...(settings.alerts.discord || { enabled: false, username: 'سامانه دفتر' }), webhookUrl: e.target.value },
+                            },
+                          });
+                        }}
+                        dir="ltr"
+                        placeholder="https://discord.com/api/webhooks/123456789/..."
+                        className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        نام کاربری بات در چنل (Username):
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.alerts.discord?.username || 'سامانه دفتر'}
+                        onChange={(e) => {
+                          updateSettings({
+                            alerts: {
+                              ...settings.alerts,
+                              discord: { ...(settings.alerts.discord || { enabled: false, webhookUrl: '' }), username: e.target.value },
+                            },
+                          });
+                        }}
+                        placeholder="سامانه دفتر"
+                        className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* فوتر تست دیسکورد */}
+                <div className="pt-3 border-t border-slate-100 dark:border-border-subtle flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">تنظیمات چنل دیسکورد: Integrations &gt; Webhooks</span>
+                  <button
+                    type="button"
+                    disabled={testingChannel === 'discord'}
+                    onClick={() => handleTestChannel('discord')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-300 font-semibold text-xs border border-indigo-200 dark:border-indigo-500/30 transition shadow-2xs disabled:opacity-50"
+                  >
+                    <Send className={`w-3 h-3 ${testingChannel === 'discord' ? 'animate-spin' : ''}`} />
+                    <span>{testingChannel === 'discord' ? 'در حال ارسال...' : 'ارسال پیام تست دیسکورد'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ۳. کانال پیام‌رسان بله */}
               <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
                 <div className="space-y-4">
                   {/* هدر کارت بله */}
@@ -995,6 +1450,251 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
                 </div>
               </div>
 
+              {/* ۶. کانال پیامک سازمانی (SMS Webhook) */}
+              <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="space-y-4">
+                  {/* هدر کارت پیامک */}
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-border-subtle">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                        <Smartphone className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">پیامک سازمانی (SMS Notification)</h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">ارسال اخطار فوری پیامکی به مدیران شبکه و زیرساخت</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings.alerts.sms?.enabled}
+                      onClick={() => {
+                        updateSettings({
+                          alerts: {
+                            ...settings.alerts,
+                            sms: {
+                              ...(settings.alerts.sms || { provider: 'generic', apiKey: '', lineNumber: '', recipients: '', webhookUrl: '' }),
+                              enabled: !settings.alerts.sms?.enabled,
+                            },
+                          },
+                        });
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        settings.alerts.sms?.enabled ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          settings.alerts.sms?.enabled ? '-translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* فیلدهای ورودی پیامک */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          سرویس‌دهنده پیامک:
+                        </label>
+                        <select
+                          value={settings.alerts.sms?.provider || 'generic'}
+                          onChange={(e) => {
+                            updateSettings({
+                              alerts: {
+                                ...settings.alerts,
+                                sms: { ...(settings.alerts.sms || { enabled: false, apiKey: '', lineNumber: '', recipients: '', webhookUrl: '' }), provider: e.target.value as any },
+                              },
+                            });
+                          }}
+                          className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-2.5 py-2 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-rose-500"
+                        >
+                          <option value="generic">وب‌هوک سفارشی POST</option>
+                          <option value="kavenegar">کاوه‌نگار (Kavenegar)</option>
+                          <option value="farazsms">فراز اس‌ام‌اس / IPPanel</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          شماره خط فرستنده:
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.alerts.sms?.lineNumber || ''}
+                          onChange={(e) => {
+                            updateSettings({
+                              alerts: {
+                                ...settings.alerts,
+                                sms: { ...(settings.alerts.sms || { enabled: false, provider: 'generic', apiKey: '', recipients: '', webhookUrl: '' }), lineNumber: e.target.value },
+                              },
+                            });
+                          }}
+                          dir="ltr"
+                          placeholder="3000..."
+                          className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-rose-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        آدرس وب‌هوک یا اندپوینت پیامک (URL):
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.alerts.sms?.webhookUrl || ''}
+                        onChange={(e) => {
+                          updateSettings({
+                            alerts: {
+                              ...settings.alerts,
+                              sms: { ...(settings.alerts.sms || { enabled: false, provider: 'generic', apiKey: '', lineNumber: '', recipients: '' }), webhookUrl: e.target.value },
+                            },
+                          });
+                        }}
+                        dir="ltr"
+                        placeholder="https://api.sms-provider.com/v1/send..."
+                        className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        شماره‌های همراه گیرندگان (با کاما جدا کنید):
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.alerts.sms?.recipients || ''}
+                        onChange={(e) => {
+                          updateSettings({
+                            alerts: {
+                              ...settings.alerts,
+                              sms: { ...(settings.alerts.sms || { enabled: false, provider: 'generic', apiKey: '', lineNumber: '', webhookUrl: '' }), recipients: e.target.value },
+                            },
+                          });
+                        }}
+                        dir="ltr"
+                        placeholder="09121111111, 09352222222"
+                        className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-lg px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* فوتر تست پیامک */}
+                <div className="pt-3 border-t border-slate-100 dark:border-border-subtle flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">توزیع پیامک در بازه‌های بحرانی و ۲۴ ساعت قبل</span>
+                  <button
+                    type="button"
+                    disabled={testingChannel === 'sms'}
+                    onClick={() => handleTestChannel('sms')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-300 font-semibold text-xs border border-rose-200 dark:border-rose-500/30 transition shadow-2xs disabled:opacity-50"
+                  >
+                    <Send className={`w-3 h-3 ${testingChannel === 'sms' ? 'animate-spin' : ''}`} />
+                    <span>{testingChannel === 'sms' ? 'در حال ارسال...' : 'ارسال پیامک تست'}</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* جدول تاریخچه تحویل هشدارها و لاگ رویدادها */}
+            <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-border-subtle">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      تاریخچه و لاگ‌های ارسال اعلان‌ها (Notification Delivery Logs)
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      ثبت خودکار تمامی پیام‌های هشدار، خلاصه‌های دوره‌ای و تست‌های انجام‌شده توسط سامانه
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={loadAlertLogs}
+                  disabled={isLoadingLogs}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-surface-2 dark:hover:bg-surface-3 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-border-strong transition shadow-2xs disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLogs ? 'animate-spin' : ''}`} />
+                  <span>به‌روزرسانی تاریخچه</span>
+                </button>
+              </div>
+
+              {alertLogs.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-border-strong text-slate-500 dark:text-slate-400 font-semibold">
+                        <th className="pb-2 w-12 text-center">ردیف</th>
+                        <th className="pb-2 w-36">زمان ثبت</th>
+                        <th className="pb-2 w-32">نوع رویداد</th>
+                        <th className="pb-2 w-44">کانال‌های دریافت‌کننده</th>
+                        <th className="pb-2">شرح و جزئیات پیام</th>
+                        <th className="pb-2 w-24 text-center">وضعیت</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-border-subtle">
+                      {alertLogs.map((log, index) => (
+                        <tr key={log.id} className="hover:bg-slate-50/70 dark:hover:bg-surface-2/40 transition">
+                          <td className="py-2.5 text-center text-slate-400">{index + 1}</td>
+                          <td className="py-2.5 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                            {new Date(log.timestamp).toLocaleDateString('fa-IR')} - {new Date(log.timestamp).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="py-2.5">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              log.type === 'EXPIRATION_ALERT'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                                : log.type === 'DIGEST'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300'
+                                : 'bg-slate-100 text-slate-700 dark:bg-surface-2 dark:text-slate-300'
+                            }`}>
+                              {log.type === 'EXPIRATION_ALERT' ? 'هشدار سررسید' : log.type === 'DIGEST' ? 'خلاصه وضعیت' : 'پیام آزمایشی'}
+                            </span>
+                          </td>
+                          <td className="py-2.5">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {log.channels && log.channels.length > 0 ? (
+                                log.channels.map((ch, i) => (
+                                  <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-surface-2 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-border-strong">
+                                    {ch}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-slate-400 text-[10px]">هیچ کانالی</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-slate-700 dark:text-slate-300 font-medium">
+                            {log.summary}
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              log.success
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                            }`}>
+                              {log.success ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <AlertTriangle className="w-3 h-3 text-rose-600" />}
+                              <span>{log.success ? 'ارسال شد' : 'خطا'}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-xs">
+                  {isLoadingLogs ? 'در حال دریافت تاریخچه...' : 'تاکنون هیچ اعلانی ثبت یا ارسال نشده است.'}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1369,6 +2069,83 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
         {/* ======================================================== */}
         {activeCategory === 'security' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in duration-200">
+            {/* کارت ویژه احراز هویت دو مرحله‌ای (2FA / TOTP) */}
+            <div className="md:col-span-2 bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                        احراز هویت دو مرحله‌ای (2FA / TOTP)
+                      </h3>
+                      {user?.twoFactorEnabled ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          فعال و محافظت‌شده
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          غیرفعال (آسیب‌پذیر)
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      ورود امن با کد ۶ رقمی مبتنی بر زمان سازگار با Google Authenticator و Microsoft Authenticator
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {user?.twoFactorEnabled ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleRegenerateRecoveryCodes}
+                        disabled={isRegeneratingCodes}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-border-strong text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-surface-2 text-xs font-semibold flex items-center gap-1.5 transition"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRegeneratingCodes ? 'animate-spin' : ''}`} />
+                        <span>کدهای بازیابی</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsDisable2FAModalOpen(true)}
+                        className="px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100 text-rose-700 dark:text-rose-300 text-xs font-semibold transition"
+                      >
+                        <span>غیرفعال‌سازی 2FA</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIs2FASetupModalOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs shadow-indigo-600/20 flex items-center gap-2 transition"
+                    >
+                      <Smartphone className="w-4 h-4" />
+                      <span>فعال‌سازی رمز دومرحله‌ای (TOTP)</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-surface-2 border border-slate-200/80 dark:border-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>نحوه عملکرد سیستم امنیتی:</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    پس از فعال‌سازی، حتی در صورت افشای کلمه عبور، هیچ کاربری بدون در دست داشتن تلفن همراه و کد متغیر ۶ رقمی قادر به ورود به سامانه نخواهد بود. همچنین ۸ کد اضطراری یکبارمصرف برای مواقع مفقودی گوشی در اختیارتان قرار می‌گیرد.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* کارت نشانگر قدرت کلمه عبور */}
             <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-border-subtle">
@@ -1628,6 +2405,133 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5"
               >
                 {isRestoring ? 'در حال اعمال بازیابی...' : 'بله، بازیابی انجام شود'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* مودال راه‌اندازی احراز هویت دومرحله‌ای (2FA / TOTP) */}
+      {is2FASetupModalOpen && (
+        <TwoFactorSetupModal
+          isOpen={is2FASetupModalOpen}
+          onClose={() => setIs2FASetupModalOpen(false)}
+          onSuccess={(codes) => {
+            setShownRecoveryCodes(codes);
+          }}
+        />
+      )}
+
+      {/* مودال تایید غیرفعال‌سازی 2FA */}
+      {isDisable2FAModalOpen && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsDisable2FAModalOpen(false);
+              setDisablePassword('');
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+        >
+          <div className="w-full max-w-sm bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl shadow-2xl p-5 text-right space-y-4">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">غیرفعال‌سازی 2FA</h3>
+                <p className="text-[11px] text-slate-500">جهت تایید هویت، رمز عبور جاری را وارد کنید</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleDisable2FA} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">رمز عبور جاری</label>
+                <input
+                  type="password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  dir="ltr"
+                  required
+                  autoFocus
+                  className="w-full bg-white dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-hidden focus:border-rose-600"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDisable2FAModalOpen(false);
+                    setDisablePassword('');
+                  }}
+                  className="flex-1 py-2 rounded-xl border border-slate-200 dark:border-border-strong text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-100"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  disabled={isDisabling2FA || !disablePassword}
+                  className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-50 transition"
+                >
+                  {isDisabling2FA ? 'در حال ثبت...' : 'غیرفعال‌سازی قطعی'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* مودال نمایش کدهای بازیابی اضطراری جدید */}
+      {shownRecoveryCodes && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShownRecoveryCodes(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+        >
+          <div className="w-full max-w-md bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl shadow-2xl p-5 text-right space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-border-subtle">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">کدهای بازیابی اضطراری جدید</h3>
+                  <p className="text-[11px] text-slate-500">کدهای جدید فعال شدند. کدهای قبلی باطل گردیدند.</p>
+                </div>
+              </div>
+              <button onClick={() => setShownRecoveryCodes(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-surface-2 rounded-xl">
+              {shownRecoveryCodes.map((code, idx) => (
+                <div key={idx} className="p-2 bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-subtle rounded-lg text-center font-mono font-bold text-xs select-all">
+                  {code}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(shownRecoveryCodes.join('\n'));
+                  showToast('کدها در حافظه کپی شدند.', 'info');
+                }}
+                className="flex-1 py-2 rounded-xl border border-slate-200 dark:border-border-strong text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-4 h-4" />
+                <span>کپی همه کدها</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShownRecoveryCodes(null)}
+                className="flex-1 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"
+              >
+                تایید و بستن
               </button>
             </div>
           </div>

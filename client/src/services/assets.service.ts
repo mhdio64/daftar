@@ -176,8 +176,8 @@ export const assetsService = {
     return api.post<{ message: string; items: Asset[] }>('/assets/batch', data);
   },
 
-  async revealSecret(assetId: string, fieldKey: string): Promise<{ fieldKey: string; value: string }> {
-    return api.post<{ fieldKey: string; value: string }>(`/assets/${assetId}/reveal-secret`, { fieldKey });
+  async revealSecret(assetId: string, fieldKey: string, accessType?: 'VIEW' | 'COPY'): Promise<{ fieldKey: string; value: string }> {
+    return api.post<{ fieldKey: string; value: string }>(`/assets/${assetId}/reveal-secret`, { fieldKey, accessType });
   },
 
   async getTimeline(assetId: string): Promise<AssetTimelineItem[]> {

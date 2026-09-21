@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, AlertTriangle, CheckCircle2, RotateCw, Calendar } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle2, RotateCw, Calendar, Bell, Send } from 'lucide-react';
 import { remindersService, ReminderItem, RemindersResponse } from '../../services/reminders.service.ts';
 import { RenewModal } from './RenewModal.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
+import { useSettings } from '../../context/SettingsContext.tsx';
+import { alertingService } from '../../services/alerting.service.ts';
 
 const getRelativeDate = (offsetDays: number): string => {
   const d = new Date();
@@ -99,10 +101,24 @@ const computeCounts = (items: ReminderItem[]) => {
 
 export function RemindersView() {
   const { showToast } = useToast();
+  const { settings } = useSettings();
   const [data, setData] = useState<RemindersResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTriggering, setIsTriggering] = useState(false);
   const [selectedForRenew, setSelectedForRenew] = useState<ReminderItem | null>(null);
   const [filter, setFilter] = useState<'all' | 'expired' | 'critical' | 'warningHigh'>('all');
+
+  const handleQuickTrigger = async () => {
+    setIsTriggering(true);
+    try {
+      const res = await alertingService.triggerServerCheck();
+      showToast(res.message || 'هشدار سررسیدها ارسال شد.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'خطا در ارسال هشدارها', 'error');
+    } finally {
+      setIsTriggering(false);
+    }
+  };
 
   const fetchReminders = async () => {
     setIsLoading(true);
@@ -175,6 +191,63 @@ export function RemindersView() {
           <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           <span>به‌روزرسانی لیست</span>
         </button>
+      </div>
+
+      {/* نوار وضعیت اتوماسیون هشدارها و کرون‌جاب سرور */}
+      <div className={`mb-6 p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs transition ${
+        settings.alerts.enableAlerts && settings.alerts.cronEnabled
+          ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-500/30'
+          : 'bg-slate-50 dark:bg-surface-2 border-slate-200 dark:border-border-strong'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className={`p-1.5 rounded-lg ${
+            settings.alerts.enableAlerts && settings.alerts.cronEnabled
+              ? 'bg-emerald-600 text-white'
+              : 'bg-slate-200 dark:bg-surface-3 text-slate-500'
+          }`}>
+            <Bell className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900 dark:text-white">
+                اتوماسیون هشدارهای سررسید (Notification Worker)
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                settings.alerts.enableAlerts && settings.alerts.cronEnabled
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+                  : 'bg-slate-200 text-slate-600 dark:bg-surface-3 dark:text-slate-400'
+              }`}>
+                {settings.alerts.enableAlerts && settings.alerts.cronEnabled
+                  ? `فعال (اجرای روزانه ساعت ${settings.alerts.cronTime || '09:00'})`
+                  : 'غیرفعال'}
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+              کانال‌های فعال:{' '}
+              {[
+                settings.alerts.telegram?.enabled && 'تلگرام',
+                settings.alerts.discord?.enabled && 'دیسکورد',
+                settings.alerts.bale?.enabled && 'بله',
+                settings.alerts.email?.enabled && 'ایمیل',
+                settings.alerts.sms?.enabled && 'پیامک',
+                settings.alerts.webhook?.enabled && 'وب‌هوک',
+              ].filter(Boolean).join('، ') || 'هیچ کانالی فعال نیست'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleQuickTrigger}
+            disabled={isTriggering}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs disabled:opacity-50"
+            title="اجرای دستی و ارسال فوری اعلان سررسیدها به کانال‌های فعال"
+          >
+            <Send className={`w-3.5 h-3.5 ${isTriggering ? 'animate-spin' : ''}`} />
+            <span>{isTriggering ? 'در حال ارسال...' : 'ارسال فوری هشدارها'}</span>
+          </button>
+        </div>
       </div>
 
       {/* کارت‌های خلاصه آمار */}

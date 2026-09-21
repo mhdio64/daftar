@@ -44,3 +44,50 @@
     @apply bg-slate-400 dark:bg-slate-600;
   }
 }
+
+/* استایل‌های اختصاصی پرینت استاندارد برچسب اموال */
+@media print {
+  @page {
+    size: auto;
+    margin: 5mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .printable-tag-area,
+  .printable-tag-area *,
+  .printable-dossier-area,
+  .printable-dossier-area * {
+    visibility: visible !important;
+  }
+
+  .printable-tag-area,
+  .printable-dossier-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .page-break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+

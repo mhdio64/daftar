@@ -18,6 +18,7 @@ export async function usersRoutes(app: FastifyInstance) {
         role: true,
         categoryPermissions: true,
         isActive: true,
+        twoFactorEnabled: true,
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -32,6 +33,7 @@ export async function usersRoutes(app: FastifyInstance) {
     return {
       items: users.map((u) => ({
         ...u,
+        twoFactorEnabled: u.twoFactorEnabled,
         categoryPermissions: Array.isArray(u.categoryPermissions) ? u.categoryPermissions : [],
         assetsCount: u._count.createdAssets,
         activityCount: u._count.auditLogs,

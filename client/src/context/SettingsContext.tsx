@@ -2,12 +2,21 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 
 export interface AlertSettings {
   enableAlerts: boolean;
+  cronEnabled: boolean;
+  cronTime: string;
   alertDaysBefore: number[];
+  digestEnabled: boolean;
+  digestFrequency: 'daily' | 'weekly';
   telegram: {
     enabled: boolean;
     botToken: string;
     chatId: string;
     apiRoot: string;
+  };
+  discord: {
+    enabled: boolean;
+    webhookUrl: string;
+    username: string;
   };
   bale: {
     enabled: boolean;
@@ -29,6 +38,14 @@ export interface AlertSettings {
     password: string;
     fromEmail: string;
     toEmails: string;
+  };
+  sms: {
+    enabled: boolean;
+    provider: 'kavenegar' | 'farazsms' | 'generic';
+    apiKey: string;
+    lineNumber: string;
+    recipients: string;
+    webhookUrl: string;
   };
 }
 
@@ -53,12 +70,21 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableStrengthMeter: true,
   alerts: {
     enableAlerts: false,
-    alertDaysBefore: [7, 3, 1],
+    cronEnabled: true,
+    cronTime: '09:00',
+    alertDaysBefore: [30, 7, 1, 0],
+    digestEnabled: true,
+    digestFrequency: 'weekly',
     telegram: {
       enabled: false,
       botToken: '',
       chatId: '',
       apiRoot: 'https://api.telegram.org',
+    },
+    discord: {
+      enabled: false,
+      webhookUrl: '',
+      username: 'سامانه دفتر',
     },
     bale: {
       enabled: false,
@@ -80,6 +106,14 @@ const DEFAULT_SETTINGS: AppSettings = {
       password: '',
       fromEmail: 'noreply@daftar.local',
       toEmails: '',
+    },
+    sms: {
+      enabled: false,
+      provider: 'generic',
+      apiKey: '',
+      lineNumber: '',
+      recipients: '',
+      webhookUrl: '',
     },
   },
 };
@@ -107,9 +141,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             ...DEFAULT_SETTINGS.alerts,
             ...(parsed.alerts || {}),
             telegram: { ...DEFAULT_SETTINGS.alerts.telegram, ...(parsed.alerts?.telegram || {}) },
+            discord: { ...DEFAULT_SETTINGS.alerts.discord, ...(parsed.alerts?.discord || {}) },
             bale: { ...DEFAULT_SETTINGS.alerts.bale, ...(parsed.alerts?.bale || {}) },
             webhook: { ...DEFAULT_SETTINGS.alerts.webhook, ...(parsed.alerts?.webhook || {}) },
             email: { ...DEFAULT_SETTINGS.alerts.email, ...(parsed.alerts?.email || {}) },
+            sms: { ...DEFAULT_SETTINGS.alerts.sms, ...(parsed.alerts?.sms || {}) },
           },
         };
       }

@@ -258,6 +258,7 @@ export async function revealSecret(params: {
   assetId: string;
   fieldKey: string;
   userId: string;
+  accessType?: 'VIEW' | 'COPY';
   ipAddress?: string;
   userAgent?: string;
 }) {
@@ -279,13 +280,21 @@ export async function revealSecret(params: {
   // رمزگشایی در حافظه سرور
   const decrypted = decryptSecret(targetPayload);
 
+  const isCopy = params.accessType === 'COPY';
+
   // ثبت لاگ رویداد امنیتی
   await logAudit({
     userId: params.userId,
-    action: 'READ_SECRET',
+    action: isCopy ? 'COPY_SECRET' : 'READ_SECRET',
     targetEntity: 'Asset',
-    targetId: asset.id,
-    diff: { field: params.fieldKey, note: 'مشاهده یا کپی فیلد محرمانه توسط کاربر' },
+    targetId: `${asset.title} (${asset.id})`,
+    diff: {
+      field: params.fieldKey,
+      assetId: asset.id,
+      assetTitle: asset.title,
+      accessType: isCopy ? 'COPY' : 'VIEW',
+      note: isCopy ? 'کپی مستقیم مقدار محرمانه به حافظه موقت (Clipboard)' : 'آشکارسازی چشمی رمز محرمانه با تایمر امنیتی ۳۰ ثانیه‌ای',
+    },
     ipAddress: params.ipAddress,
     userAgent: params.userAgent,
   });

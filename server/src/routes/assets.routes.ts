@@ -307,11 +307,12 @@ export async function assetsRoutes(app: FastifyInstance) {
     return { message: 'دارایی با موفقیت حذف شد.' };
   });
 
-  // بازگشایی و رمزگشایی فیلد محرمانه (Reveal Secret) با ثبت لاگ امنیتی
+  // بازگشایی و رمزگشایی فیلد محرمانه (Reveal Secret) با اعتبارسنجی سطح دسترسی و ثبت لاگ امنیتی
   app.post('/:id/reveal-secret', { preHandler: [requireAuth] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const schema = z.object({
       fieldKey: z.string().min(1, 'نام فیلد محرمانه الزامی است'),
+      accessType: z.enum(['VIEW', 'COPY']).optional(),
     });
 
     const parsed = schema.safeParse(request.body);
@@ -319,10 +320,25 @@ export async function assetsRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: parsed.error.errors[0].message });
     }
 
+    const asset = await prisma.asset.findUnique({
+      where: { id },
+      select: { id: true, assetTypeId: true },
+    });
+
+    if (!asset) {
+      return reply.status(404).send({ message: 'دارایی مورد نظر یافت نشد.' });
+    }
+
+    // پیشگیری از آسیب‌پذیری BOLA/IDOR
+    if (!canAccessCategory(request.user!, asset.assetTypeId)) {
+      return reply.status(403).send({ message: 'عدم دسترسی مجاز به فیلدهای محرمانه این دارایی.' });
+    }
+
     try {
       const plainSecret = await revealSecret({
         assetId: id,
         fieldKey: parsed.data.fieldKey,
+        accessType: parsed.data.accessType,
         userId: request.user!.id,
         ipAddress: request.ip,
         userAgent: request.headers['user-agent'],
@@ -452,6 +468,19 @@ export async function assetsRoutes(app: FastifyInstance) {
 
     if (!canAccessCategory(request.user!, asset.assetTypeId)) {
       return reply.status(403).send({ message: 'شما اجازه ویرایش دارایی در این دسته را ندارید.' });
+    }
+
+    const targetAsset = await prisma.asset.findUnique({
+      where: { id: parsed.data.targetAssetId },
+      select: { assetTypeId: true },
+    });
+
+    if (!targetAsset) {
+      return reply.status(404).send({ message: 'دارایی مقصد یافت نشد.' });
+    }
+
+    if (!canAccessCategory(request.user!, targetAsset.assetTypeId)) {
+      return reply.status(403).send({ message: 'شما اجازه ایجاد ارتباط با دسته دارایی مقصد را ندارید.' });
     }
 
     try {

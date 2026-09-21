@@ -1,6 +1,6 @@
 import { api } from './api.ts';
 
-export type FieldType = 'text' | 'ip_port' | 'secret' | 'select' | 'jalali_date' | 'url';
+export type FieldType = 'text' | 'email' | 'ip_port' | 'secret' | 'select' | 'jalali_date' | 'url';
 
 export interface FieldDefinition {
   id: string;

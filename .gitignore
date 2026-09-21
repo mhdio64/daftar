@@ -4,9 +4,12 @@ node_modules/
 
 # Environment files
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+server/.env
+server/.env.*
+client/.env
+client/.env.*
 
 # Build outputs
 dist/
@@ -27,10 +30,14 @@ pnpm-debug.log*
 server/prisma/*.db
 server/prisma/*.sqlite
 
-# Uploads and User Files
+# Uploads, Backups, and Dynamic Data
 uploads/
 server/uploads/
 backups/
+data/
+server/data/
+*.sql
+*.sql.gz
 
 # OS and Editor files
 .DS_Store
