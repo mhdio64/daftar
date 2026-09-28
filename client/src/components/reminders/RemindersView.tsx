@@ -124,7 +124,11 @@ export function RemindersView() {
     setIsLoading(true);
     try {
       const res = await remindersService.getAll();
-      setData(res);
+      const rawItems = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? (res as unknown as ReminderItem[]) : [];
+      setData({
+        items: rawItems,
+        counts: res?.counts || computeCounts(rawItems),
+      });
     } catch (err: any) {
       console.warn('API reminders unreachable, falling back to demo mode:', err);
       const demoItems = generateDemoReminders();
@@ -163,7 +167,10 @@ export function RemindersView() {
     });
   };
 
-  const filteredItems = (data?.items || []).filter((item) => {
+  const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? (data as unknown as ReminderItem[]) : [];
+  const counts = data?.counts || computeCounts(items);
+
+  const filteredItems = items.filter((item) => {
     if (filter === 'expired') return item.status === 'expired';
     if (filter === 'critical') return item.status === 'critical' || item.status === 'expired';
     if (filter === 'warningHigh') return item.status === 'warningHigh' || item.status === 'critical' || item.status === 'expired';
@@ -254,7 +261,7 @@ export function RemindersView() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="p-4 rounded-xl bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-subtle shadow-xs">
           <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">کل سرویس‌های دارای سررسید</div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1 font-mono">{data?.counts.total ?? 0}</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1 font-mono">{counts.total}</div>
         </div>
 
         <div className="p-4 rounded-xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/30 shadow-xs">
@@ -262,7 +269,7 @@ export function RemindersView() {
             <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
             <span>منقضی شده</span>
           </div>
-          <div className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1 font-mono">{data?.counts.expired ?? 0}</div>
+          <div className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-1 font-mono">{counts.expired}</div>
         </div>
 
         <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/30 shadow-xs">
@@ -271,7 +278,7 @@ export function RemindersView() {
             <span>سررسید فوری (کمتر از ۷ روز)</span>
           </div>
           <div className="text-2xl font-bold text-amber-800 dark:text-amber-400 mt-1 font-mono">
-            {(data?.counts.critical ?? 0) + (data?.counts.warningHigh ?? 0)}
+            {counts.critical + counts.warningHigh}
           </div>
         </div>
 
@@ -281,7 +288,7 @@ export function RemindersView() {
             <span>مهلت کافی (بیش از ۳۰ روز)</span>
           </div>
           <div className="text-2xl font-bold text-emerald-800 dark:text-emerald-400 mt-1 font-mono">
-            {Math.max(0, (data?.counts.total ?? 0) - ((data?.counts.expired ?? 0) + (data?.counts.warningMid ?? 0) + (data?.counts.warningHigh ?? 0) + (data?.counts.critical ?? 0)))}
+            {Math.max(0, counts.total - (counts.expired + counts.warningMid + counts.warningHigh + counts.critical))}
           </div>
         </div>
       </div>
@@ -296,7 +303,7 @@ export function RemindersView() {
               : 'bg-white dark:bg-surface-2 border border-slate-200 dark:border-border-strong text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:text-white shadow-2xs'
           }`}
         >
-          همه موارد ({data?.counts.total ?? 0})
+          همه موارد ({counts.total})
         </button>
         <button
           onClick={() => setFilter('expired')}
@@ -306,7 +313,7 @@ export function RemindersView() {
               : 'bg-white dark:bg-surface-2 border border-slate-200 dark:border-border-strong text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:text-white shadow-2xs'
           }`}
         >
-          منقضی‌ها ({data?.counts.expired ?? 0})
+          منقضی‌ها ({counts.expired})
         </button>
         <button
           onClick={() => setFilter('warningHigh')}
@@ -316,7 +323,7 @@ export function RemindersView() {
               : 'bg-white dark:bg-surface-2 border border-slate-200 dark:border-border-strong text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:text-white shadow-2xs'
           }`}
         >
-          سررسید این هفته ({(data?.counts.critical ?? 0) + (data?.counts.warningHigh ?? 0)})
+          سررسید این هفته ({counts.critical + counts.warningHigh})
         </button>
       </div>
 
