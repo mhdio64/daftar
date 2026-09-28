@@ -35,8 +35,9 @@ server/prisma/*.sqlite
 uploads/
 server/uploads/
 backups/
-data/
+/data/
 server/data/
+!client/src/data/
 *.sql
 *.sql.gz
 
