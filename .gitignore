@@ -37,9 +37,10 @@ server/uploads/
 backups/
 /data/
 server/data/
-!client/src/data/
 *.sql
 *.sql.gz
+!server/prisma/migrations/**/*.sql
+!prisma/migrations/**/*.sql
 
 # OS and Editor files
 .DS_Store
