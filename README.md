@@ -20,21 +20,19 @@ In many organizations and engineering teams, critical IT infrastructure details�
 
 ## ✨ Key Features
 
-- 🔐 **Field-Level Encryption (AES-256-GCM):** Sensitive values (passwords, private keys, API secrets) are encrypted before hitting the database with randomized IVs and 16-byte authentication tags (Auth Tags). Plaintext is never stored in database dumps.
-- 🛡️ **Zero-Knowledge Two-Factor Authentication (2FA / RFC 6238):** Compatible with Google Authenticator, Microsoft Authenticator, and 1Password. TOTP secrets are encrypted at rest with AES-256, and emergency recovery codes are one-way hashed with SHA-256.
-- 👁️ **Secret Unmask & Copy Tracking (Audit Trail):** Every time a user clicks the reveal/eye icon or copies a secret to the clipboard, an audit record is logged with the user's ID, timestamp, and IP address.
-- 🏷️ **Physical Asset Tagging & Label Printing:** Generate printable, standardized asset stickers with corporate logos, unique asset codes, titles, and QR/barcodes. Includes an in-app mobile camera scanner.
-- ⏰ **Automated Expiration Alerts (Notification Worker):** Built-in background worker that dispatches threshold notifications (30 days, 7 days, 24 hours, and day of expiration) to **Telegram, Bale, Discord, SMS, Email, and custom Webhooks**, plus automated weekly digest summaries.
-- 📊 **Excel & PDF Dossier Exports:** One-click `.xlsx` exports for accounting and auditing, template generation for bulk imports, and formatted printable official asset dossier views.
-- 👥 **Role-Based & Category-Based Access Control (RBAC & ABAC):** Granular permission model separating `ADMIN`, `EDITOR`, and `VIEWER`, with per-category access restrictions.
-- 🛡️ **OWASP Hardened:** Includes protection against Server-Side Request Forgery (SSRF), Broken Object-Level Authorization (BOLA/IDOR), session hijacking (8-hour JWT expiration), brute-force throttling (`@fastify/rate-limit`), and security headers (`@fastify/helmet`).
-- 📦 **Automated Daily Backups:** Isolated Docker container generating daily compressed `.sql.gz` database dumps with automated 30-day retention rotation.
+- 🔐 **Field-Level Encryption (AES-256-GCM):** Sensitive values (passwords, private keys, API secrets) are encrypted before hitting the database. Plaintext is never stored in database dumps.
+- 🛡️ **Zero-Knowledge Two-Factor Authentication (2FA / RFC 6238):** Compatible with Google Authenticator, Microsoft Authenticator, and 1Password.
+- 👁️ **Secret Unmask & Copy Tracking (Audit Trail):** Every reveal/copy action is logged with user ID, timestamp, and IP address.
+- 🏷️ **Physical Asset Tagging & Label Printing:** QR/barcode stickers with in-app mobile camera scanner.
+- ⏰ **Automated Expiration Alerts:** Notifications 30 days, 7 days, 24 hours before expiry via **Telegram, Bale, Discord, SMS, Email, and Webhooks**.
+- 📊 **Multi-Sheet Excel Export:** One-click `.xlsx` export with one sheet per asset type, financial summary dashboard, and professional RTL styling.
+- 👥 **Role-Based Access Control (RBAC):** Granular `ADMIN`, `EDITOR`, and `VIEWER` roles with per-category restrictions.
+- 🛡️ **OWASP Hardened:** SSRF, BOLA/IDOR, brute-force throttling, security headers, 8-hour JWT expiration.
+- 📦 **Automated Daily Backups:** Keeps last 7 daily compressed `.sql.gz` dumps automatically.
 
 ---
 
-## 🚀 Quick Start with Docker (Recommended)
-
-The easiest and most secure method to deploy Daftar on your internal network or VPS is using **Docker Compose**:
+## 🚀 Quick Start — Docker (Recommended)
 
 ### 1. Clone the repository
 ```bash
@@ -42,105 +40,248 @@ git clone https://github.com/mhdio64/daftar.git
 cd daftar
 ```
 
-### 2. Configure Environment Variables
-Copy the sample environment file:
+### 2. Configure environment variables
 ```bash
-cp .env.example .env
+cp .env.production.example .env
+nano .env   # Edit the values below
 ```
 
 > [!IMPORTANT]
-> Generate a cryptographically secure 32-byte (64 hexadecimal characters) master encryption key:
+> Generate secure secrets before deploying:
 > ```bash
-> openssl rand -hex 32
+> # Run this twice — once for JWT_SECRET, once for MASTER_ENCRYPTION_KEY:
+> node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 > ```
-> Paste this key into the `MASTER_ENCRYPTION_KEY` variable in your `.env` file.
+> Paste the outputs into your `.env` file and set a strong `POSTGRES_PASSWORD`.
 
-### 3. Start the Services
+### 3. Start everything
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-This launches:
-- **PostgreSQL 16** database container
-- **Fastify API Server**
-- **Caddy Reverse Proxy** with automated local HTTPS
-- **Daily Database Backup Worker**
+> [!NOTE]
+> On first start, the server **automatically runs database migrations**.
+> No manual migration step is needed — `entrypoint.sh` handles it.
 
-### 4. Access the Application
-* Open your browser and navigate to:
-  **`http://localhost`** or **`https://localhost`**
-* Default initial administrator credentials:
-  - **Username:** `admin`
-  - **Password:** `admin123456`
+### 4. Access the application
+
+| | |
+|---|---|
+| **URL** | `https://YOUR_SERVER_IP` |
+| **Default user** | `admin` |
+| **Default password** | `admin123456` |
+
+> [!WARNING]
+> Change the default password immediately after first login via **User Management**.
 
 ---
 
 ## 💻 Local Development Setup
 
-To run and contribute to the project locally using Node.js:
-
-### Prerequisites:
+### Prerequisites
 - **Node.js** >= 20.0.0
 - **pnpm** >= 9.0.0 (`npm install -g pnpm`)
-- **Docker** (for running PostgreSQL)
+- **Docker** (for PostgreSQL only)
 
-### Setup Steps:
+### Steps
 
-1. **Install dependencies:**
-   ```bash
-   pnpm install
-   ```
-
-2. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Start the PostgreSQL database:**
-   ```bash
-   docker compose up -d postgres
-   ```
-
-4. **Sync database schema and seed standard types:**
-   ```bash
-   pnpm --filter daftar-server exec prisma db push
-   pnpm --filter daftar-server prisma:seed
-   ```
-
-5. **Start frontend and backend in watch mode:**
-   ```bash
-   pnpm dev
-   ```
-   - Client UI: `http://localhost:5173`
-   - API Server: `http://localhost:3000`
-
----
-
-## 🔒 Security Best Practices
-
-1. **Change Default Credentials:** Change the default `admin` password immediately after initial login from **User Management**.
-2. **Enable 2FA:** Set up Two-Factor Authentication under **Settings** and securely store the 8 emergency recovery codes.
-3. **Environment Isolation:** Ensure `.env` is never committed to source control. Production deployments must specify a unique `JWT_SECRET` and `MASTER_ENCRYPTION_KEY`.
-4. **Rate Limiting:** Authentication routes are rate-limited to 10 requests per minute per IP to prevent dictionary and credential stuffing attacks.
-
----
-
-## 📦 Disaster Recovery & Backups
-
-Daftar provides two backup tiers:
-1. **Application JSON Bundle:** Exported by administrators from **Settings > Backup & Restore** for cross-instance migration.
-2. **PostgreSQL Binary Dumps:** Daily automated `.sql.gz` database dumps saved to the `backups/` volume.
-
-To restore a database dump:
 ```bash
-gunzip < backups/daftar_backup_YYYYMMDD_HHMMSS.sql.gz | docker exec -i daftar_postgres psql -U daftar_user -d daftar_db
+# 1. Install dependencies
+pnpm install
+
+# 2. Configure environment (point DATABASE_URL to localhost)
+cp .env.production.example .env
+
+# 3. Start only the database
+docker compose up -d postgres
+
+# 4. Push schema to database
+pnpm --filter daftar-server exec prisma db push
+
+# 5. Start frontend + backend with hot reload
+pnpm dev
+```
+
+| Service | URL |
+|---------|-----|
+| Frontend (Vite HMR) | `http://localhost:5173` |
+| Backend API | `http://localhost:3000` |
+
+---
+
+## 🔄 Updating the Application
+
+### Scenario 1 — Server with internet access
+
+Use the included update script. It **automatically backs up the database** before applying any changes:
+
+```bash
+bash update.sh
+```
+
+**What happens step by step:**
+
+```
+bash update.sh
+    │
+    ├─ 📦 Backup database  →  pre_update_backup_YYYYMMDD.sql.gz
+    ├─ 🔄 git pull          →  fetch latest code
+    ├─ 🔨 docker compose up -d --build  →  rebuild containers
+    └─ ✅ entrypoint.sh runs prisma migrate deploy automatically
+```
+
+> [!TIP]
+> Data is always safe — it lives in **Docker volumes**, not inside containers.
+> Rebuilding or removing containers never deletes your data.
+
+---
+
+### Scenario 2 — Server without internet (internal / air-gapped network)
+
+Run this **on your laptop** (which has internet), not on the server:
+
+```bash
+bash deploy_offline.sh <SERVER_IP> [SSH_USER]
+
+# Example:
+bash deploy_offline.sh 192.168.1.100 admin
+```
+
+**What happens automatically:**
+
+```
+Your laptop (has internet)              Internal server (no internet)
+──────────────────────────              ─────────────────────────────
+git pull
+    ↓
+docker compose build
+    ↓
+docker save → .tar.gz
+    ↓
+scp + rsync ─────────────────────────→ Receive files
+                                             ↓
+                                        📦 Backup database
+                                             ↓
+                                        docker load (images)
+                                             ↓
+                                        docker compose up -d
+                                             ↓
+                                        ✅ Update complete
+```
+
+> [!NOTE]
+> **Prerequisite:** SSH access from your laptop to the server over the local network (LAN/VPN).
+
+---
+
+### How to rollback if something goes wrong
+
+```bash
+# 1. Find the previous commit
+git log --oneline -5
+
+# 2. Go back to it
+git checkout <previous-commit-hash>
+
+# 3. Rebuild with old code
+docker compose up -d --build
+
+# 4. If the database schema was also changed, restore from backup:
+gunzip < pre_update_backup_YYYYMMDD.sql.gz \
+  | docker compose exec -T postgres psql -U daftar_user -d daftar_db
 ```
 
 ---
 
-## 📚 Technical Documentation
+## 📦 Backup & Restore
 
-In-depth technical architecture and schema specifications are available in the [`docs/`](./docs/) directory:
+### Automatic daily backups
+
+A dedicated container runs every 24 hours and retains the **last 7 backups** automatically:
+
+```
+/backups/
+  daftar_backup_20241007_030000.sql.gz  ← newest
+  daftar_backup_20241006_030000.sql.gz
+  daftar_backup_20241005_030000.sql.gz
+  daftar_backup_20241004_030000.sql.gz
+  daftar_backup_20241003_030000.sql.gz
+  daftar_backup_20241002_030000.sql.gz
+  daftar_backup_20241001_030000.sql.gz  ← oldest (7th, then deleted)
+```
+
+> No configuration needed — disk usage stays fixed at `7 × database size`.
+
+### Manual backup
+
+```bash
+docker compose exec postgres pg_dump -U daftar_user daftar_db \
+  | gzip > backup_$(date +%Y%m%d_%H%M%S).sql.gz
+```
+
+### Restore from SQL dump
+
+```bash
+gunzip < daftar_backup_YYYYMMDD_HHMMSS.sql.gz \
+  | docker compose exec -T postgres psql -U daftar_user -d daftar_db
+```
+
+### Application-level backup (JSON bundle)
+
+Administrators can export/import a full data bundle from:
+**Settings → Backup & Restore**
+
+This includes all asset types, assets, tags, and settings — useful for cross-instance migration.
+
+---
+
+## 🏗️ Architecture Overview
+
+```
+Browser
+   │
+   ▼ HTTPS :443
+┌──────────────────────┐
+│  Caddy               │  ← TLS termination, serves React SPA,
+│  (reverse proxy)     │    proxies /api/* to backend
+└──────────┬───────────┘
+           │ /api/*
+           ▼
+┌──────────────────────┐
+│  Fastify API Server  │  ← JWT auth, AES-256-GCM encryption,
+│  (Node.js 20)        │    audit logging, RBAC
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐     ┌────────────────────────┐
+│  PostgreSQL 16       │     │  Backup Worker         │
+│  (persistent volume) │     │  Daily .sql.gz, last 7 │
+└──────────────────────┘     └────────────────────────┘
+```
+
+**Docker volumes — data persists across all updates:**
+
+| Volume | Contents |
+|--------|----------|
+| `postgres_data` | All database records |
+| `uploads_data` | Uploaded files and attachments |
+| `backups_data` | Automated daily SQL dumps |
+| `client_dist` | Built React SPA (recreated on each update) |
+
+---
+
+## 🔒 Security Checklist
+
+- [ ] Change default `admin` password after first login
+- [ ] Enable 2FA in **Settings → Security** and store recovery codes offline
+- [ ] Set unique `JWT_SECRET` and `MASTER_ENCRYPTION_KEY` in `.env`
+- [ ] Set a strong `POSTGRES_PASSWORD` (not the example default)
+- [ ] Firewall: expose only ports `80` and `443`; keep `5432` internal
+- [ ] Never commit `.env` — it is in `.gitignore`
+
+---
+
+## 📚 Technical Documentation
 
 - [01. Architecture & Stack](./docs/01-architecture-and-stack.md)
 - [02. Data Model & Schema](./docs/02-data-model-and-schema.md)
