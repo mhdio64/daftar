@@ -436,7 +436,7 @@ function AppContent() {
         />
 
         {/* نماهای اصلی سامانه به صورت ماژولار با حفاظ امنیتی خطا */}
-        <ErrorBoundary fallbackTitle="خطا در بارگذاری بخش انتخاب‌شده">
+        <ErrorBoundary key={activeTab} fallbackTitle="خطا در بارگذاری بخش انتخاب‌شده">
           <Suspense
             fallback={
               <div className="flex-1 flex items-center justify-center p-16 text-slate-400">

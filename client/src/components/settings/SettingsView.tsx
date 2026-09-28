@@ -677,13 +677,14 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
                           { days: 1, label: '۲۴ ساعت قبل' },
                           { days: 0, label: 'روز سررسید' },
                         ].map((item) => {
-                          const isSelected = settings.alerts.alertDaysBefore.includes(item.days);
+                          const alertDays = Array.isArray(settings?.alerts?.alertDaysBefore) ? settings.alerts.alertDaysBefore : [30, 7, 1, 0];
+                          const isSelected = alertDays.includes(item.days);
                           return (
                             <button
                               key={item.days}
                               type="button"
                               onClick={() => {
-                                const current = settings.alerts.alertDaysBefore;
+                                const current = alertDays;
                                 const next = isSelected 
                                   ? current.filter((d) => d !== item.days) 
                                   : [...current, item.days].sort((a, b) => b - a);

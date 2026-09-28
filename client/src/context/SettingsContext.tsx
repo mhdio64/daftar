@@ -150,6 +150,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           alerts: {
             ...DEFAULT_SETTINGS.alerts,
             ...(parsed.alerts || {}),
+            alertDaysBefore: Array.isArray(parsed.alerts?.alertDaysBefore)
+              ? parsed.alerts.alertDaysBefore
+              : DEFAULT_SETTINGS.alerts.alertDaysBefore,
             telegram: { ...DEFAULT_SETTINGS.alerts.telegram, ...(parsed.alerts?.telegram || {}) },
             discord: { ...DEFAULT_SETTINGS.alerts.discord, ...(parsed.alerts?.discord || {}) },
             bale: { ...DEFAULT_SETTINGS.alerts.bale, ...(parsed.alerts?.bale || {}) },
@@ -167,17 +170,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
+      const prevAlerts = prev?.alerts || DEFAULT_SETTINGS.alerts;
       const updated: AppSettings = {
+        ...DEFAULT_SETTINGS,
         ...prev,
         ...newSettings,
-        ...(newSettings.alerts
-          ? {
-              alerts: {
-                ...prev.alerts,
-                ...newSettings.alerts,
-              },
-            }
-          : {}),
+        alerts: {
+          ...DEFAULT_SETTINGS.alerts,
+          ...prevAlerts,
+          ...(newSettings.alerts || {}),
+          alertDaysBefore: Array.isArray(newSettings.alerts?.alertDaysBefore)
+            ? newSettings.alerts.alertDaysBefore
+            : Array.isArray(prevAlerts.alertDaysBefore)
+            ? prevAlerts.alertDaysBefore
+            : DEFAULT_SETTINGS.alerts.alertDaysBefore,
+          telegram: { ...DEFAULT_SETTINGS.alerts.telegram, ...(prevAlerts.telegram || {}), ...(newSettings.alerts?.telegram || {}) },
+          discord: { ...DEFAULT_SETTINGS.alerts.discord, ...(prevAlerts.discord || {}), ...(newSettings.alerts?.discord || {}) },
+          bale: { ...DEFAULT_SETTINGS.alerts.bale, ...(prevAlerts.bale || {}), ...(newSettings.alerts?.bale || {}) },
+          webhook: { ...DEFAULT_SETTINGS.alerts.webhook, ...(prevAlerts.webhook || {}), ...(newSettings.alerts?.webhook || {}) },
+          email: { ...DEFAULT_SETTINGS.alerts.email, ...(prevAlerts.email || {}), ...(newSettings.alerts?.email || {}) },
+          sms: { ...DEFAULT_SETTINGS.alerts.sms, ...(prevAlerts.sms || {}), ...(newSettings.alerts?.sms || {}) },
+        },
       };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));

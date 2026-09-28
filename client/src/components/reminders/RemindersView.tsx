@@ -195,13 +195,13 @@ export function RemindersView() {
 
       {/* نوار وضعیت اتوماسیون هشدارها و کرون‌جاب سرور */}
       <div className={`mb-6 p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs transition ${
-        settings.alerts.enableAlerts && settings.alerts.cronEnabled
+        settings?.alerts?.enableAlerts && settings?.alerts?.cronEnabled
           ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-500/30'
           : 'bg-slate-50 dark:bg-surface-2 border-slate-200 dark:border-border-strong'
       }`}>
         <div className="flex items-center gap-2.5">
           <div className={`p-1.5 rounded-lg ${
-            settings.alerts.enableAlerts && settings.alerts.cronEnabled
+            settings?.alerts?.enableAlerts && settings?.alerts?.cronEnabled
               ? 'bg-emerald-600 text-white'
               : 'bg-slate-200 dark:bg-surface-3 text-slate-500'
           }`}>
@@ -213,24 +213,24 @@ export function RemindersView() {
                 اتوماسیون هشدارهای سررسید (Notification Worker)
               </span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                settings.alerts.enableAlerts && settings.alerts.cronEnabled
+                settings?.alerts?.enableAlerts && settings?.alerts?.cronEnabled
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
                   : 'bg-slate-200 text-slate-600 dark:bg-surface-3 dark:text-slate-400'
               }`}>
-                {settings.alerts.enableAlerts && settings.alerts.cronEnabled
-                  ? `فعال (اجرای روزانه ساعت ${settings.alerts.cronTime || '09:00'})`
+                {settings?.alerts?.enableAlerts && settings?.alerts?.cronEnabled
+                  ? `فعال (اجرای روزانه ساعت ${settings?.alerts?.cronTime || '09:00'})`
                   : 'غیرفعال'}
               </span>
             </div>
             <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
               کانال‌های فعال:{' '}
               {[
-                settings.alerts.telegram?.enabled && 'تلگرام',
-                settings.alerts.discord?.enabled && 'دیسکورد',
-                settings.alerts.bale?.enabled && 'بله',
-                settings.alerts.email?.enabled && 'ایمیل',
-                settings.alerts.sms?.enabled && 'پیامک',
-                settings.alerts.webhook?.enabled && 'وب‌هوک',
+                settings?.alerts?.telegram?.enabled && 'تلگرام',
+                settings?.alerts?.discord?.enabled && 'دیسکورد',
+                settings?.alerts?.bale?.enabled && 'بله',
+                settings?.alerts?.email?.enabled && 'ایمیل',
+                settings?.alerts?.sms?.enabled && 'پیامک',
+                settings?.alerts?.webhook?.enabled && 'وب‌هوک',
               ].filter(Boolean).join('، ') || 'هیچ کانالی فعال نیست'}
             </span>
           </div>
@@ -341,7 +341,7 @@ export function RemindersView() {
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/90 dark:hover:bg-surface-2/60 transition">
                     <td className="p-3 font-semibold text-slate-900 dark:text-white">{item.title}</td>
-                    <td className="p-3 font-medium text-indigo-700 dark:text-indigo-400">{item.assetType.name}</td>
+                    <td className="p-3 font-medium text-indigo-700 dark:text-indigo-400">{item.assetType?.name || 'عمومی'}</td>
                     <td className="p-3 font-mono text-slate-700 dark:text-slate-300">{dateStr}</td>
                     <td className="p-3 font-mono font-medium text-slate-800 dark:text-slate-200">
                       {item.daysRemaining < 0

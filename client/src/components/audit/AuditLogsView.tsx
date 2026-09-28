@@ -185,10 +185,10 @@ export function AuditLogsView() {
     const q = searchQuery.toLowerCase();
     return logs.filter(
       (log) =>
-        log.targetId.toLowerCase().includes(q) ||
+        (log.targetId && log.targetId.toLowerCase().includes(q)) ||
         (log.ipAddress && log.ipAddress.includes(q)) ||
-        log.user.fullName.toLowerCase().includes(q) ||
-        log.user.username.toLowerCase().includes(q) ||
+        (log.user?.fullName && log.user.fullName.toLowerCase().includes(q)) ||
+        (log.user?.username && log.user.username.toLowerCase().includes(q)) ||
         (log.diff && JSON.stringify(log.diff).toLowerCase().includes(q))
     );
   }, [logs, searchQuery]);
@@ -469,12 +469,12 @@ export function AuditLogsView() {
                       {/* کاربر */}
                       <td className="p-3">
                         <div className="font-bold text-slate-900 dark:text-white">
-                          {log.user.fullName || log.user.username}
+                          {log.user?.fullName || log.user?.username || 'سیستم'}
                         </div>
                         <div className="text-[11px] text-slate-500 font-mono">
-                          @{log.user.username} •{' '}
+                          @{log.user?.username || 'system'} •{' '}
                           <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-sans">
-                            {log.user.role === 'ADMIN' ? 'مدیر ارشد' : log.user.role === 'EDITOR' ? 'اپراتور' : 'مشاهده‌گر'}
+                            {log.user?.role === 'ADMIN' ? 'مدیر ارشد' : log.user?.role === 'EDITOR' ? 'اپراتور' : 'مشاهده‌گر'}
                           </span>
                         </div>
                       </td>
@@ -607,7 +607,7 @@ export function AuditLogsView() {
                 <div>
                   <span className="text-slate-500 dark:text-slate-400 block mb-0.5">کاربر مجری:</span>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {selectedLog.user.fullName} (@{selectedLog.user.username})
+                    {selectedLog.user?.fullName || selectedLog.user?.username || 'سیستم'} (@{selectedLog.user?.username || 'system'})
                   </span>
                 </div>
 
@@ -669,7 +669,7 @@ export function AuditLogsView() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-border-subtle font-mono text-[11px]">
-                        {Object.entries(selectedLog.diff).map(([key, val]: [string, any]) => {
+                        {Object.entries(selectedLog.diff || {}).map(([key, val]: [string, any]) => {
                           const hasOldNew = val && typeof val === 'object' && ('old' in val || 'new' in val);
                           return (
                             <tr key={key} className="hover:bg-slate-50 dark:hover:bg-surface-2/40">

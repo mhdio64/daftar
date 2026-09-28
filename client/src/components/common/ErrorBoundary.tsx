@@ -25,6 +25,13 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('Uncaught error inside ErrorBoundary:', error, errorInfo);
   }
 
+  public componentDidUpdate(prevProps: Props) {
+    // بازنشانی وضعیت خطا در صورت تغییر فرزندان یا کلید تب
+    if (this.state.hasError && prevProps.children !== this.props.children) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
   private handleRetry = () => {
     this.setState({ hasError: false, error: null });
   };
@@ -43,6 +50,12 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               مشکلی در اجرای یا فراخوانی این بخش رخ داده است. می‌توانید مجدداً تلاش کنید یا صفحه را تازه‌سازی نمایید.
             </p>
+            {this.state.error && (
+              <details className="text-[11px] font-mono text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/30 p-2.5 rounded-lg text-left" dir="ltr">
+                <summary className="cursor-pointer text-xs font-sans text-rose-700 dark:text-rose-300 font-medium">جزئیات خطا</summary>
+                <div className="mt-1.5 whitespace-pre-wrap break-all">{this.state.error.message}</div>
+              </details>
+            )}
             <div className="pt-2 flex justify-center gap-2">
               <button
                 type="button"
@@ -68,3 +81,4 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+

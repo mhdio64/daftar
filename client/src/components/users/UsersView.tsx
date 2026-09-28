@@ -76,7 +76,7 @@ const DEMO_USERS: ManagedUser[] = [
   },
 ];
 
-export function UsersView({ assetTypes }: UsersViewProps) {
+export function UsersView({ assetTypes = [] }: UsersViewProps) {
   const { user: currentUser } = useAuth();
   const { showToast } = useToast();
 
@@ -508,7 +508,7 @@ export function UsersView({ assetTypes }: UsersViewProps) {
                     دسته‌های مجاز برای این کاربر:
                   </div>
                   <div className="space-y-1.5">
-                    {assetTypes.map((type) => (
+                    {(assetTypes || []).map((type) => (
                       <label
                         key={type.id}
                         className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
