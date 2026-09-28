@@ -1,7 +1,12 @@
-# کانفیگ پروکسی معکوس Caddy با فعال‌سازی خودکار HTTPS داخلی
-# این قابلیت کپی با ۱-کلیک (Clipboard API) را در شبکه محلی فعال می‌سازد
-:443 {
-    tls internal
+# کانفیگ پروکسی معکوس Caddy با پشتیبانی هم‌زمان از HTTP و HTTPS داخلی
+{
+    auto_https disable_redirects
+}
+
+:80, :443 {
+    tls internal {
+        on_demand
+    }
 
     # فایل‌های استاتیک فرانت‌اند React SPA
     root * /usr/share/caddy
