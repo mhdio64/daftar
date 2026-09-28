@@ -31,7 +31,11 @@ COPY --from=builder /app/server/prisma ./server/prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/server/node_modules ./server/node_modules
 
+# اسکریپت راه‌اندازی که migrate را قبل از سرور اجرا می‌کند
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 WORKDIR /app/server
 EXPOSE 3000
 
-CMD ["node", "dist/app.js"]
+ENTRYPOINT ["/entrypoint.sh"]
