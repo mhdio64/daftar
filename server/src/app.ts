@@ -31,20 +31,7 @@ export async function buildApp() {
   // ثبت پلاگین‌های اصلی
   // ثبت پلاگین‌های اصلی با سیاست امنیتی CORS
   await app.register(cors, {
-    origin: (origin, cb) => {
-      // مجاز بودن درخواست‌های داخلی یا محیط لوکال‌هاست
-      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-        cb(null, true);
-        return;
-      }
-      // دامنه‌های مجاز سفارشی از فایل محیطی
-      const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()) || [];
-      if (allowedOrigins.includes(origin)) {
-        cb(null, true);
-        return;
-      }
-      cb(new Error('دسترسی امنیتی CORS: مبدا درخواست غیرمجاز است.'), false);
-    },
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   });

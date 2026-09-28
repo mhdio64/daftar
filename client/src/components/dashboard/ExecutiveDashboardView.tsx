@@ -358,11 +358,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
   }, [data, selectedFilterCategory, searchQuery]);
 
   const expiredCount = useMemo(() => {
-    return data?.expiringAssets.filter((a) => a.isExpired).length || 0;
+    return data?.expiringAssets?.filter((a) => a.isExpired).length || 0;
   }, [data]);
 
   const urgentCount = useMemo(() => {
-    return data?.expiringAssets.filter((a) => !a.isExpired && a.daysRemaining <= 7).length || 0;
+    return data?.expiringAssets?.filter((a) => !a.isExpired && a.daysRemaining <= 7).length || 0;
   }, [data]);
 
   // یافتن دارایی برای باز کردن مودال
@@ -400,12 +400,12 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
     );
   }
 
-  const tomanMonthly = data?.costTotals['تومان']?.monthly || 0;
-  const tomanYearly = data?.costTotals['تومان']?.yearly || 0;
-  const usdMonthly = data?.costTotals['دلار ($)']?.monthly || 0;
-  const usdYearly = data?.costTotals['دلار ($)']?.yearly || 0;
-  const eurMonthly = data?.costTotals['یورو (€)']?.monthly || 0;
-  const eurYearly = data?.costTotals['یورو (€)']?.yearly || 0;
+  const tomanMonthly = data?.costTotals?.['تومان']?.monthly || 0;
+  const tomanYearly = data?.costTotals?.['تومان']?.yearly || 0;
+  const usdMonthly = data?.costTotals?.['دلار ($)']?.monthly || 0;
+  const usdYearly = data?.costTotals?.['دلار ($)']?.yearly || 0;
+  const eurMonthly = data?.costTotals?.['یورو (€)']?.monthly || 0;
+  const eurYearly = data?.costTotals?.['یورو (€)']?.yearly || 0;
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-canvas p-6 space-y-6">
@@ -669,7 +669,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
             {/* جزئیات ارز انتخاب‌شده */}
             {(() => {
-              const activeStats = data?.costTotals[selectedCurrencyTab] || { monthly: 0, yearly: 0 };
+              const activeStats = data?.costTotals?.[selectedCurrencyTab] || { monthly: 0, yearly: 0 };
               const symbol =
                 selectedCurrencyTab === 'تومان'
                   ? 'تومان'
