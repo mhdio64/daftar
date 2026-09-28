@@ -125,35 +125,39 @@ function AppContent() {
     }
   }, [token]);
 
-  // بارگذاری دارایی‌های دسته فعال با فال‌بک نمونه‌های دمو
+  // بارگذاری دارایی‌های دسته فعال با اولویت دیتابیس واقعی
   const loadAssets = async (typeId: string) => {
     setIsAssetsLoading(true);
     try {
       const res = await assetsService.getAll({ assetTypeId: typeId });
-      if (res.items && res.items.length > 0) {
+      if (Array.isArray(res?.items)) {
         setAssets(res.items);
         setIsAssetsLoading(false);
         return;
       }
-    } catch {}
+    } catch {
+      // فال‌بک آفلاین در صورت خطای شبکه
+    }
 
-    // بررسی آیا دارایی‌ها در localStorage ذخیره شده‌اند
+    // بررسی در localStorage فقط برای حالت دمو یا آفلاین
     try {
       const stored = localStorage.getItem('daftar_demo_assets');
       if (stored) {
         const parsed: Asset[] = JSON.parse(stored);
         const filtered = parsed.filter((a) => a.assetTypeId === typeId);
-        if (filtered.length > 0) {
-          setAssets(filtered);
-          setIsAssetsLoading(false);
-          return;
-        }
+        setAssets(filtered);
+        setIsAssetsLoading(false);
+        return;
       }
     } catch {}
 
-    // تولید داده‌های نمونه برای پیش‌نمایش
-    const sampleAssets = getAllSampleAssets(assetTypes).filter((a) => a.assetTypeId === typeId);
-    setAssets(sampleAssets);
+    // در محیط واقعی اگر دیتابیس خالی است، لیست خالی معتبر است
+    if (token === 'demo-token-preview') {
+      const sampleAssets = getAllSampleAssets(assetTypes).filter((a) => a.assetTypeId === typeId);
+      setAssets(sampleAssets);
+    } else {
+      setAssets([]);
+    }
     setIsAssetsLoading(false);
   };
 

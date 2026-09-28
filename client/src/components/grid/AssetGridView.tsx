@@ -89,7 +89,7 @@ export const AssetGridView: React.FC<AssetGridViewProps> = ({
   // استخراج تمام برچسب‌های موجود در دسته جاری به همراه تعداد
   const availableTagsWithCount = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const a of assets) {
+    for (const a of (assets || [])) {
       if (Array.isArray(a.tags)) {
         for (const t of a.tags) {
           const clean = t.trim();
@@ -104,7 +104,7 @@ export const AssetGridView: React.FC<AssetGridViewProps> = ({
 
   // دارایی‌های فیلتر شده بر اساس متن، برچسب‌ها و وضعیت سررسید
   const filteredAssets = useMemo(() => {
-    return assets.filter((asset) => {
+    return (assets || []).filter((asset) => {
       // ۱. فیلتر متنی (جستجو در عنوان، برچسب‌ها و کلیه فیلدها)
       if (filterSearch.trim()) {
         const q = filterSearch.trim().toLowerCase();

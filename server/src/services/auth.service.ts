@@ -55,11 +55,15 @@ export function hashPassword(password: string): string {
  * اعتبارسنجی رمز عبور وارد شده در برابر هش ذخیره‌شده
  */
 export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!password || !storedHash || typeof storedHash !== 'string') return false;
   const [salt, key] = storedHash.split(':');
   if (!salt || !key) return false;
 
   const keyBuffer = Buffer.from(key, 'hex');
   const derivedKey = crypto.scryptSync(password, salt, SCRYPT_KEYLEN);
+  if (keyBuffer.length !== derivedKey.length) {
+    return false;
+  }
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 }
 

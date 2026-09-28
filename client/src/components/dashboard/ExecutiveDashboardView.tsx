@@ -204,7 +204,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
       }
 
       // آمار دسته‌بندی‌ها
-      const categoryStats = assetTypes.map((t) => {
+      const categoryStats = (assetTypes || []).map((t) => {
         const count = localAssets.filter((a) => a.assetTypeId === t.id).length;
         return {
           id: t.id,
@@ -223,7 +223,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
         .filter((a) => a.expiryDate && new Date(a.expiryDate) <= thirtyDaysLater)
         .sort((a, b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime())
         .map((a) => {
-          const type = assetTypes.find((t) => t.id === a.assetTypeId);
+          const type = (assetTypes || []).find((t) => t.id === a.assetTypeId);
           const expDate = new Date(a.expiryDate!);
           return {
             id: a.id,

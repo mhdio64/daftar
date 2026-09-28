@@ -158,7 +158,7 @@ export async function usersRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  // حذف کاربر
+  // حذف کاربر (با پشتیبانی از حفاظت یکپارچگی دیتابیس و Soft-deactivate)
   app.delete('/:id', { preHandler: [requireAdmin] }, async (request, reply) => {
     const { id } = request.params as { id: string };
 
@@ -166,9 +166,51 @@ export async function usersRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: 'امکان حذف حساب کاربری خودتان وجود ندارد.' });
     }
 
-    const existing = await prisma.user.findUnique({ where: { id } });
+    const existing = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            auditLogs: true,
+            createdAssets: true,
+            uploadedAttachments: true,
+          },
+        },
+      },
+    });
+
     if (!existing) {
       return reply.status(404).send({ message: 'کاربر یافت نشد.' });
+    }
+
+    const hasRelations =
+      existing._count.auditLogs > 0 ||
+      existing._count.createdAssets > 0 ||
+      existing._count.uploadedAttachments > 0;
+
+    if (hasRelations) {
+      // غیرفعال‌سازی کاربر جهت حفظ سوابق ممیزی و ارجاعات دیتابیس
+      await prisma.user.update({
+        where: { id },
+        data: {
+          isActive: false,
+        },
+      });
+
+      await logAudit({
+        userId: request.user!.id,
+        action: 'UPDATE',
+        targetEntity: 'User',
+        targetId: id,
+        diff: { status: { old: 'ACTIVE', new: 'DEACTIVATED' }, reason: 'سوابق مرتبط در سیستم وجود دارد' },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return {
+        message: 'به دلیل وجود سوابق ثبتی و لاگ‌های ممیزی، حساب کاربری غیرفعال شد.',
+        deactivated: true,
+      };
     }
 
     await prisma.user.delete({ where: { id } });

@@ -81,6 +81,136 @@ export async function assetsRoutes(app: FastifyInstance) {
     };
   });
 
+  // دریافت اطلاعات خلاصه و آمار مدیریتی داشبورد
+  app.get('/dashboard/summary', { preHandler: [requireAuth] }, async (request) => {
+    const user = request.user!;
+
+    // دریافت دسته‌بندی‌های موجود
+    const allAssetTypes = await prisma.assetType.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    const accessibleAssetTypes = allAssetTypes.filter((t) => canAccessCategory(user, t.id));
+    const accessibleTypeIds = accessibleAssetTypes.map((t) => t.id);
+
+    // واکشی تمام دارایی‌های مجاز برای کاربر
+    const assets = await prisma.asset.findMany({
+      where: {
+        assetTypeId: { in: accessibleTypeIds },
+      },
+      include: {
+        assetType: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // ۱. آمار دسته‌ها
+    const categoryStats = accessibleAssetTypes.map((t) => {
+      const count = assets.filter((a) => a.assetTypeId === t.id).length;
+      return {
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        icon: t.icon,
+        count,
+      };
+    });
+
+    // ۲. دارایی‌های در آستانه انقضا یا منقضی شده
+    const now = new Date();
+    const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+
+    const expiringAssets = assets
+      .filter((a) => a.expiryDate && new Date(a.expiryDate) <= thirtyDaysLater)
+      .sort((a, b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime())
+      .map((a) => {
+        const expDate = new Date(a.expiryDate!);
+        const isExpired = expDate < now;
+        const daysRemaining = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
+
+        return {
+          id: a.id,
+          title: a.title,
+          assetTypeId: a.assetTypeId,
+          assetTypeName: a.assetType?.name,
+          assetTypeIcon: a.assetType?.icon,
+          expiryDate: a.expiryDate!.toISOString(),
+          isExpired,
+          daysRemaining,
+        };
+      });
+
+    // ۳. محاسبه هزینه‌ها
+    const costTotals: Record<string, { monthly: number; yearly: number }> = {
+      'تومان': { monthly: 0, yearly: 0 },
+      'دلار ($)': { monthly: 0, yearly: 0 },
+      'یورو (€)': { monthly: 0, yearly: 0 },
+    };
+
+    const costDrivers: Array<{
+      id: string;
+      title: string;
+      assetTypeId: string;
+      assetTypeName?: string;
+      assetTypeIcon?: string;
+      amount: number;
+      formattedAmount: string;
+      currency: string;
+      billingCycle: string;
+      monthlyNormalized: number;
+    }> = [];
+
+    for (const a of assets) {
+      const vals = (a.values as Record<string, any>) || {};
+      const rawCost = vals.cost_amount;
+      if (!rawCost) continue;
+
+      const numStr = String(rawCost).replace(/,/g, '').replace(/[^\d.]/g, '');
+      const num = parseFloat(numStr);
+      if (isNaN(num) || num <= 0) continue;
+
+      const curr = vals.cost_currency || 'تومان';
+      const cycle = vals.billing_cycle || 'ماهانه';
+
+      if (!costTotals[curr]) {
+        costTotals[curr] = { monthly: 0, yearly: 0 };
+      }
+
+      let monthlyNormalized = num;
+      if (cycle === 'سالانه') {
+        costTotals[curr].yearly += num;
+        costTotals[curr].monthly += Math.round(num / 12);
+        monthlyNormalized = Math.round(num / 12);
+      } else {
+        costTotals[curr].monthly += num;
+        costTotals[curr].yearly += num * 12;
+      }
+
+      costDrivers.push({
+        id: a.id,
+        title: a.title,
+        assetTypeId: a.assetTypeId,
+        assetTypeName: a.assetType?.name,
+        assetTypeIcon: a.assetType?.icon,
+        amount: num,
+        formattedAmount: num.toLocaleString('fa-IR'),
+        currency: curr,
+        billingCycle: cycle,
+        monthlyNormalized,
+      });
+    }
+
+    costDrivers.sort((a, b) => b.monthlyNormalized - a.monthlyNormalized);
+
+    return {
+      totalAssets: assets.length,
+      categoryStats,
+      expiringAssets,
+      costTotals,
+      costDrivers: costDrivers.slice(0, 10),
+    };
+  });
+
   // مشاهده یک دارایی به صورت تکی
   app.get('/:id', { preHandler: [requireAuth] }, async (request, reply) => {
     const { id } = request.params as { id: string };
