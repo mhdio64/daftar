@@ -32,6 +32,7 @@ export interface Asset {
   assetTypeId: string;
   assetType: AssetType;
   title: string;
+  icon?: string | null;
   values: Record<string, any>;
   tags?: string[];
   relations?: AssetRelation[];
@@ -138,6 +139,7 @@ export const assetsService = {
   async create(data: {
     assetTypeId: string;
     title: string;
+    icon?: string | null;
     values: Record<string, any>;
     tags?: string[];
     expiryDate?: string | null;
@@ -150,6 +152,7 @@ export const assetsService = {
     id: string,
     data: {
       title?: string;
+      icon?: string | null;
       values?: Record<string, any>;
       tags?: string[];
       expiryDate?: string | null;
@@ -167,6 +170,7 @@ export const assetsService = {
     assetTypeId: string;
     items: Array<{
       title: string;
+      icon?: string | null;
       inputValues: Record<string, any>;
       tags?: string[];
       expiryDate?: string | null;

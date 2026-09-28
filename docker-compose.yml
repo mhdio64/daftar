@@ -16,6 +16,17 @@ services:
       - client_dist:/usr/share/caddy:ro
     depends_on:
       - server
+      - client
+
+  # بیلد و سرو فایل‌های استاتیک فرانت‌اند React
+  client:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.client
+    container_name: daftar_client
+    volumes:
+      - client_dist:/target
+    restart: "no"
 
   # سرور بک‌اند API
   server:

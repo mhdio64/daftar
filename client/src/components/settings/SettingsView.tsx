@@ -34,7 +34,10 @@ import {
   X,
   Copy,
   Clock,
-  Calendar
+  Calendar,
+  FileSpreadsheet,
+  Loader2,
+  Layers
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
@@ -47,6 +50,10 @@ import { auditService } from '../../services/audit.service.ts';
 import { AssetType } from '../../services/asset-types.service.ts';
 import { Asset } from '../../services/assets.service.ts';
 import { TwoFactorSetupModal } from './TwoFactorSetupModal.tsx';
+import {
+  exportComprehensiveFinancialExcel,
+  fetchAllOrgAssets,
+} from '../../services/excel.service.ts';
 
 interface SettingsViewProps {
   onDataRestored?: () => void;
@@ -59,6 +66,32 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
   const { showToast } = useToast();
 
   const [activeCategory, setActiveCategory] = useState<'alerts' | 'backup' | 'quick_connect' | 'security' | 'appearance' | 'about'>('alerts');
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [excelMaskSecrets, setExcelMaskSecrets] = useState(true);
+
+  const handleExcelExport = async () => {
+    if (!assetTypes || assetTypes.length === 0) {
+      showToast('هیچ دسته دارایی‌ای در سامانه تعریف نشده است.', 'error');
+      return;
+    }
+    setIsExportingExcel(true);
+    try {
+      const allAssets = await fetchAllOrgAssets(assetTypes);
+      exportComprehensiveFinancialExcel(assetTypes, allAssets, {
+        includeSecrets: !excelMaskSecrets,
+        includeTags: true,
+        includeDates: true,
+      });
+      showToast(
+        `کارنامه جامع اکسل (${assetTypes.length} شیت، ${allAssets.length} دارایی) با موفقیت دانلود شد.`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast(err.message || 'خطا در ایجاد فایل اکسل', 'error');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
   const [isDispatchingAll, setIsDispatchingAll] = useState(false);
   const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
@@ -1953,6 +1986,90 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
               </div>
 
             </div>
+
+            {/* ─────────────────────────────────────────────────────── */}
+            {/* کارت: خروجی اکسل جامع چند شیتی                         */}
+            {/* ─────────────────────────────────────────────────────── */}
+            <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex items-start gap-3.5 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      خروجی اکسل جامع کل دارایی‌های سازمان
+                    </h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 flex items-center gap-1">
+                      <Layers className="w-3 h-3" />
+                      Multi-Sheet
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                    دانلود یک فایل <code className="font-mono text-emerald-600">.xlsx</code> با رنگ‌بندی حرفه‌ای: یک شیت داشبورد مالی کل سازمان + یک شیت مستقل برای هر نوع دارایی شامل تمام رکوردها.
+                  </p>
+                </div>
+              </div>
+
+              {/* پیش‌نمایش شیت‌ها */}
+              {assetTypes && assetTypes.length > 0 && (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-surface-2/40 border border-slate-200 dark:border-border-subtle">
+                  <p className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-1.5">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-500" />
+                    شیت‌هایی که در فایل اکسل ایجاد می‌شوند:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-200 font-bold text-[10.5px] border border-indigo-200 dark:border-indigo-800">
+                      📊 داشبورد و خلاصه مالی
+                    </span>
+                    {assetTypes.map((type) => (
+                      <span
+                        key={type.id}
+                        className="px-2 py-0.5 rounded-md bg-white dark:bg-surface-1 text-slate-700 dark:text-slate-300 text-[10.5px] border border-slate-200 dark:border-border-strong"
+                      >
+                        {type.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* گزینه ماسک‌سازی رمزها */}
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={excelMaskSecrets}
+                  onChange={(e) => setExcelMaskSecrets(e.target.checked)}
+                  className="rounded border-slate-300 dark:border-border-strong text-indigo-600 focus:ring-0 w-4 h-4"
+                />
+                <Shield className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span><strong>ماسک‌سازی رمزهای عبور و اطلاعات محرمانه</strong> — توصیه می‌شود برای ارائه به حسابداری و مدیران فعال بماند</span>
+              </label>
+
+              {/* دکمه دانلود */}
+              <button
+                type="button"
+                onClick={handleExcelExport}
+                disabled={isExportingExcel || !assetTypes || assetTypes.length === 0}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-700 hover:to-indigo-700 text-white font-bold text-xs shadow-sm shadow-emerald-600/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isExportingExcel ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>در حال واکشی داده‌ها و ایجاد شیت‌ها...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>
+                      دانلود کارنامه جامع اکسل
+                      {assetTypes ? ` (${assetTypes.length} شیت)` : ''}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         )}
 
@@ -2317,6 +2434,74 @@ export function SettingsView({ onDataRestored, assetTypes, assets }: SettingsVie
                   <span>معمولی (فضادار)</span>
                   <span className="text-[10px] font-normal text-slate-500">خوانایی بالا و پدینگ باز</span>
                 </button>
+              </div>
+            </div>
+
+            {/* تقویم و ارقام سامانه */}
+            <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">گاه‌شمار و زبان نمایش ارقام</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">تنظیمات تقویم رسمی و نگارش اعداد در سراسر سامانه</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    گاه‌شمار پیش‌فرض:
+                  </label>
+                  <select
+                    value={settings.calendarType}
+                    onChange={(e) => updateSettings({ calendarType: e.target.value as any })}
+                    className="w-full bg-slate-50 dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white"
+                  >
+                    <option value="jalali">تقویم هجری شمسی (جلالی)</option>
+                    <option value="gregorian">تقویم میلادی (Gregorian)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    فرمت ارقام و مبالغ:
+                  </label>
+                  <select
+                    value={settings.persianNumbers ? 'true' : 'false'}
+                    onChange={(e) => updateSettings({ persianNumbers: e.target.value === 'true' })}
+                    className="w-full bg-slate-50 dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white"
+                  >
+                    <option value="true">ارقام فارسی استاندارد (۱۲۳،۴۵۶)</option>
+                    <option value="false">ارقام انگلیسی لاتین (123,456)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* صفحه فرود پیش‌فرض سامانه */}
+            <div className="bg-white dark:bg-surface-1 border border-slate-200 dark:border-border-strong rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-border-subtle">
+                <div className="p-2 rounded-xl bg-violet-50 dark:bg-violet-600/20 text-violet-600 dark:text-violet-400">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">صفحه پیش‌فرض پس از ورود</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">نمای اصلی باز شونده هنگام بارگذاری اولیه سیستم</p>
+                </div>
+              </div>
+
+              <div>
+                <select
+                  value={settings.defaultLandingTab}
+                  onChange={(e) => updateSettings({ defaultLandingTab: e.target.value as any })}
+                  className="w-full bg-slate-50 dark:bg-surface-2 border border-slate-300 dark:border-border-strong rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value="dashboard">داشبورد اجرایی و آماری دارایی‌ها</option>
+                  <option value="assets">جدول دارایی‌های دسته اول</option>
+                  <option value="reminders">مرکز هشدارهای سررسید و تمدید</option>
+                </select>
               </div>
             </div>
           </div>

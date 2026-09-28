@@ -7,6 +7,7 @@ import {
 } from '../services/auth.service.js';
 import { requireAuth } from '../middlewares/auth.middleware.js';
 import { logAudit } from '../services/audit.service.js';
+import { prisma } from '../services/prisma.service.js';
 
 export async function authRoutes(app: FastifyInstance) {
   // بررسی نیاز به ویزارد راه‌اندازی اولیه
@@ -297,8 +298,34 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  // دریافت اطلاعات کاربر جاری
+  // دریافت اطلاعات کاربر جاری به همراه تنظیمات شخصی‌سازی و وضعیت امنیتی
   app.get('/me', { preHandler: [requireAuth] }, async (request) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: request.user!.id },
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          role: true,
+          categoryPermissions: true,
+          twoFactorEnabled: true,
+          preferences: true,
+          createdAt: true,
+        },
+      });
+      if (user) {
+        return {
+          user: {
+            ...user,
+            categoryPermissions: Array.isArray(user.categoryPermissions) ? user.categoryPermissions : [],
+            preferences: (typeof user.preferences === 'object' && user.preferences !== null) ? user.preferences : {},
+          },
+        };
+      }
+    } catch {
+      // fallback
+    }
     return { user: request.user };
   });
 }

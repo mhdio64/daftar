@@ -3,6 +3,9 @@ import { Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { assetsService } from '../../services/assets.service.ts';
 import { auditService } from '../../services/audit.service.ts';
 import { useToast } from '../../context/ToastContext.tsx';
+import { useSettings } from '../../context/SettingsContext.tsx';
+import { useAuth } from '../../context/AuthContext.tsx';
+import { playCopyChime } from '../../utils/sound.ts';
 
 interface SecretCellProps {
   assetId: string;
@@ -11,25 +14,28 @@ interface SecretCellProps {
 
 export function SecretCell({ assetId, fieldKey }: SecretCellProps) {
   const { showToast } = useToast();
+  const { settings } = useSettings();
+  const { user } = useAuth();
   const [isRevealed, setIsRevealed] = useState(false);
   const [secretValue, setSecretValue] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [countdown, setCountdown] = useState(30);
+  const hideSeconds = settings.autoHideSecretSeconds || 30;
+  const [countdown, setCountdown] = useState(hideSeconds);
 
   const timerRef = useRef<any>(null);
 
-  // تایمر ۳۰ ثانیه‌ای پنهان‌سازی خودکار جهت جلوگیری از سرقت چشمی (Shoulder Surfing)
+  // تایمر پنهان‌سازی خودکار بر اساس تنظیمات شخصی کاربر جهت جلوگیری از سرقت چشمی (Shoulder Surfing)
   useEffect(() => {
     if (isRevealed) {
-      setCountdown(30);
+      setCountdown(hideSeconds);
       timerRef.current = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             setIsRevealed(false);
             setSecretValue(null);
             clearInterval(timerRef.current);
-            return 30;
+            return hideSeconds;
           }
           return prev - 1;
         });
@@ -41,7 +47,7 @@ export function SecretCell({ assetId, fieldKey }: SecretCellProps) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRevealed]);
+  }, [isRevealed, hideSeconds]);
 
   // مخفی‌سازی خودکار در صورت تعویض تب مرورگر توسط کاربر
   useEffect(() => {
@@ -119,6 +125,10 @@ export function SecretCell({ assetId, fieldKey }: SecretCellProps) {
 
       await navigator.clipboard.writeText(valueToCopy || '');
       setCopied(true);
+      const shouldPlaySound = user?.preferences?.copyFeedbackSound !== undefined ? user.preferences.copyFeedbackSound : settings.copyFeedbackSound;
+      if (shouldPlaySound) {
+        playCopyChime();
+      }
       showToast('رمز عبور با موفقیت کپی شد.', 'success');
 
       await auditService.recordAudit({

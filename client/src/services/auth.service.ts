@@ -1,5 +1,26 @@
 import { api } from './api.ts';
 
+export interface UserPreferences {
+  theme?: 'light' | 'dark' | 'system';
+  defaultDensity?: 'compact' | 'comfortable';
+  defaultLandingTab?: 'dashboard' | 'assets' | 'reminders';
+  defaultAssetTypeId?: string | null;
+  autoHideSecretSeconds?: number;
+  copyFeedbackSound?: boolean;
+  calendarType?: 'jalali' | 'gregorian';
+  persianNumbers?: boolean;
+  avatarColor?: string;
+  email?: string;
+  phoneNumber?: string;
+  personalAlerts?: {
+    enabled: boolean;
+    telegram?: { enabled: boolean; chatId: string };
+    bale?: { enabled: boolean; chatId: string };
+    email?: { enabled: boolean; toEmail: string };
+    sms?: { enabled: boolean; phoneNumber: string };
+  };
+}
+
 export interface User {
   id: string;
   username: string;
@@ -7,6 +28,11 @@ export interface User {
   role: 'ADMIN' | 'EDITOR' | 'VIEWER';
   categoryPermissions: string[];
   twoFactorEnabled?: boolean;
+  preferences?: UserPreferences;
+  createdAt?: string;
+  updatedAt?: string;
+  assetsCount?: number;
+  activityCount?: number;
 }
 
 export interface AuthResponse {

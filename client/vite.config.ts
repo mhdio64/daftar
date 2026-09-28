@@ -14,4 +14,14 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-xlsx': ['xlsx', 'xlsx-js-style'],
+        },
+      },
+    },
+  },
 });

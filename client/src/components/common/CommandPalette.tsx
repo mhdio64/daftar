@@ -47,6 +47,7 @@ function getCategoryIcon(iconName: string | undefined, typeId: string) {
 }
 
 import { TagBadge } from './TagBadge.tsx';
+import { AssetIcon } from './AssetIcon.tsx';
 
 // پایگاه داده جامع دارایی‌های دمو جهت جستجوی بلادرنگ در تمام دسته‌بندی‌ها
 const DEFAULT_SEARCH_POOL: Asset[] = [
@@ -417,7 +418,7 @@ export function CommandPalette({ isOpen, onClose, onSelectAsset, assetTypes, cur
                         ? 'bg-indigo-600 text-white'
                         : 'bg-indigo-50 border border-indigo-200/60 text-indigo-700 dark:bg-indigo-600/15 dark:text-indigo-400 dark:border-transparent'
                     }`}>
-                      {getCategoryIcon(asset.assetType?.icon, asset.assetTypeId)}
+                      <AssetIcon name={asset.icon || asset.assetType?.icon} className="w-4 h-4" />
                     </div>
                     <div className="truncate">
                       <div className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition truncate">

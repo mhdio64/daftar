@@ -58,7 +58,9 @@ export type AuditActionType =
   | '2FA_ENABLE'
   | '2FA_DISABLE'
   | 'EXPORT_BACKUP'
-  | 'RESTORE_BACKUP';
+  | 'RESTORE_BACKUP'
+  | 'UPDATE_PROFILE'
+  | 'CHANGE_PASSWORD';
 
 /**
  * ثبت لاگ یک عملیات در دیتابیس

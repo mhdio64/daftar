@@ -4,6 +4,7 @@ import fastifyJwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import compress from '@fastify/compress';
 import { env } from './config/env.js';
 import { connectDatabase } from './services/prisma.service.js';
 import { notificationWorkerService } from './services/notification-worker.service.js';
@@ -18,6 +19,7 @@ import { usersRoutes } from './routes/users.routes.js';
 import { attachmentsRoutes } from './routes/attachments.routes.js';
 import { alertsRoutes } from './routes/alerts.routes.js';
 import { backupRoutes } from './routes/backup.routes.js';
+import { profileRoutes } from './routes/profile.routes.js';
 
 export async function buildApp() {
   const app = fastify({
@@ -77,6 +79,13 @@ export async function buildApp() {
     }),
   });
 
+  // فشرده‌سازی خودکار پاسخ‌های HTTP (Brotli / Gzip) جهت کاهش پهنای باند و افزایش چشمگیر سرعت
+  await app.register(compress, {
+    global: true,
+    threshold: 1024, // پاسخ‌های بالای ۱ کیلوبایت به طور خودکار فشرده می‌شوند
+    encodings: ['br', 'gzip', 'deflate'],
+  });
+
   // مسیرهای بررسی سلامت
   app.get('/health', async () => {
     return {
@@ -97,6 +106,7 @@ export async function buildApp() {
   await app.register(attachmentsRoutes, { prefix: '/api/attachments' });
   await app.register(alertsRoutes, { prefix: '/api/alerts' });
   await app.register(backupRoutes, { prefix: '/api/backup' });
+  await app.register(profileRoutes, { prefix: '/api/profile' });
 
   return app;
 }

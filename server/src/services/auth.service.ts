@@ -35,6 +35,7 @@ export interface AuthUser {
   role: Role;
   categoryPermissions: string[];
   twoFactorEnabled?: boolean;
+  preferences?: Record<string, any>;
 }
 
 export type LoginResult =
@@ -148,6 +149,7 @@ export async function authenticate(username: string, password: string): Promise<
       role: user.role,
       categoryPermissions: permissions,
       twoFactorEnabled: false,
+      preferences: (typeof user.preferences === 'object' && user.preferences !== null) ? (user.preferences as Record<string, any>) : {},
     },
   };
 }
@@ -182,6 +184,7 @@ export async function verifyLogin2FA(userId: string, code: string): Promise<Auth
         role: user.role,
         categoryPermissions: permissions,
         twoFactorEnabled: true,
+        preferences: (typeof user.preferences === 'object' && user.preferences !== null) ? (user.preferences as Record<string, any>) : {},
       };
     }
   }
@@ -221,6 +224,7 @@ export async function verifyLogin2FA(userId: string, code: string): Promise<Auth
       role: user.role,
       categoryPermissions: permissions,
       twoFactorEnabled: true,
+      preferences: (typeof user.preferences === 'object' && user.preferences !== null) ? (user.preferences as Record<string, any>) : {},
     };
   }
 

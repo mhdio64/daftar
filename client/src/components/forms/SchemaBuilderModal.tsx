@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Sliders, Eye, EyeOff, Copy } from 'lucide-react';
 import { AssetType, FieldDefinition, FieldType, assetTypesService } from '../../services/asset-types.service.ts';
+import { AssetIcon } from '../common/AssetIcon.tsx';
+import { IconPickerModal } from '../common/IconPickerModal.tsx';
 import { useToast } from '../../context/ToastContext.tsx';
 
 interface SchemaBuilderModalProps {
@@ -12,6 +14,8 @@ interface SchemaBuilderModalProps {
 export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilderModalProps) {
   const { showToast } = useToast();
   const [fields, setFields] = useState<FieldDefinition[]>(() => assetType.schemaDefinition || []);
+  const [typeIcon, setTypeIcon] = useState(assetType.icon || 'Server');
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<FieldType>('text');
@@ -73,18 +77,20 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
     setIsSaving(true);
     try {
       const updated = await assetTypesService.update(assetType.id, {
+        icon: typeIcon,
         schemaDefinition: fields,
       });
-      showToast('ساختار فیلدها با موفقیت به‌روزرسانی شد.', 'success');
+      showToast('ساختار و آیکون نوع دارایی با موفقیت به‌روزرسانی شد.', 'success');
       onSaved(updated);
       onClose();
     } catch (err: any) {
       console.warn('API update schema unreachable, updating locally in demo mode:', err);
       const updatedLocal: AssetType = {
         ...assetType,
+        icon: typeIcon,
         schemaDefinition: fields,
       };
-      showToast('ساختار فیلدها با موفقیت به‌روزرسانی شد.', 'success');
+      showToast('ساختار و آیکون نوع دارایی با موفقیت به‌روزرسانی شد.', 'success');
       onSaved(updatedLocal);
       onClose();
     } finally {
@@ -105,13 +111,27 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
       >
         {/* هدر */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-border-subtle shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-transparent">
-              <Sliders className="w-5 h-5" />
-            </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsIconPickerOpen(true)}
+              className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-500/30 flex items-center justify-center transition shadow-2xs group cursor-pointer"
+              title="کلیک برای تغییر آیکون این نوع دارایی"
+            >
+              <AssetIcon name={typeIcon} className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            </button>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">مدیریت فیلدهای پویا: {assetType.name}</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">فیلدهای سفارشی مورد نیاز، نمایش در جدول و دکمه کپی را تنظیم کنید</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">مدیریت ساختار و آیکون: {assetType.name}</h2>
+                <button
+                  type="button"
+                  onClick={() => setIsIconPickerOpen(true)}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+                >
+                  (تغییر آیکون)
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">آیکون شاخص، فیلدهای سفارشی مورد نیاز و نمایش در جدول را تنظیم کنید</p>
             </div>
           </div>
           <button
@@ -317,6 +337,18 @@ export function SchemaBuilderModal({ assetType, onClose, onSaved }: SchemaBuilde
           </button>
         </div>
       </div>
+
+      {/* مودال انتخاب آیکون نوع دارایی */}
+      <IconPickerModal
+        isOpen={isIconPickerOpen}
+        title={`انتخاب آیکون نوع دارایی «${assetType.name}»`}
+        description="یک آیکون شاخص برای نمایش این دسته در منوی کناری، جدول‌ها و داشبورد انتخاب کنید."
+        currentIcon={typeIcon}
+        defaultCategoryIcon="Server"
+        showResetToDefault={false}
+        onSelect={(newIcon) => setTypeIcon(newIcon || 'Server')}
+        onClose={() => setIsIconPickerOpen(false)}
+      />
     </div>
   );
 }

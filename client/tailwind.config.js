@@ -16,6 +16,7 @@ export default {
         surface: {
           1: 'rgb(var(--color-surface-1) / <alpha-value>)',
           2: 'rgb(var(--color-surface-2) / <alpha-value>)',
+          3: 'rgb(var(--color-surface-3) / <alpha-value>)',
           elevated: 'rgb(var(--color-surface-elevated) / <alpha-value>)',
         },
         border: {

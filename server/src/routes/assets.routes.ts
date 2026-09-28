@@ -106,6 +106,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     const schema = z.object({
       assetTypeId: z.string().min(1, 'شناسه دسته دارایی الزامی است'),
       title: z.string().min(1, 'عنوان دارایی الزامی است'),
+      icon: z.string().optional().nullable(),
       values: z.record(z.any()).default({}),
       tags: z.array(z.string()).optional(),
       expiryDate: z.string().optional().nullable(),
@@ -126,6 +127,7 @@ export async function assetsRoutes(app: FastifyInstance) {
         userId: request.user!.id,
         assetTypeId: parsed.data.assetTypeId,
         title: parsed.data.title,
+        icon: parsed.data.icon,
         inputValues: parsed.data.values,
         tags: parsed.data.tags,
         expiryDate: parsed.data.expiryDate ? new Date(parsed.data.expiryDate) : null,
@@ -147,6 +149,7 @@ export async function assetsRoutes(app: FastifyInstance) {
       items: z.array(
         z.object({
           title: z.string().min(1, 'عنوان دارایی الزامی است'),
+          icon: z.string().optional().nullable(),
           inputValues: z.record(z.any()).default({}),
           tags: z.array(z.string()).optional(),
           expiryDate: z.string().optional().nullable(),
@@ -167,6 +170,7 @@ export async function assetsRoutes(app: FastifyInstance) {
     try {
       const itemsToCreate = parsed.data.items.map((item) => ({
         title: item.title,
+        icon: item.icon,
         inputValues: item.inputValues,
         tags: item.tags,
         expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
@@ -265,6 +269,7 @@ export async function assetsRoutes(app: FastifyInstance) {
         assetId: id,
         userId: request.user!.id,
         title: body.title,
+        icon: body.icon,
         inputValues: body.values,
         tags: Array.isArray(body.tags) ? body.tags : undefined,
         expiryDate: body.expiryDate ? new Date(body.expiryDate) : body.expiryDate === null ? null : undefined,

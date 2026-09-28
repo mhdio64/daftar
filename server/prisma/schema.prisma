@@ -27,6 +27,7 @@ model User {
   twoFactorEnabled    Boolean      @default(false)
   twoFactorSecret     String?
   twoFactorRecoveryCodes Json      @default("[]") // کدهای بازیابی اضطراری یکبارمصرف
+  preferences         Json         @default("{}") // تنظیمات و شخصی‌سازی‌های کاربر
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
@@ -56,6 +57,7 @@ model AssetType {
   assets           Asset[]
   attachments      Attachment[]
 
+  @@index([displayOrder])
   @@map("asset_types")
 }
 
@@ -64,6 +66,7 @@ model Asset {
   assetTypeId     String
   assetType       AssetType    @relation(fields: [assetTypeId], references: [id], onDelete: Cascade)
   title           String       // عنوان دارایی (مثلا "سرور اصلی دیتاسنتر تهران")
+  icon            String?      // نام آیکون اختصاصی دارایی (در صورت خالی بودن از آیکون نوع دارایی ارث‌بری می‌کند)
   values          Json         @default("{}") // مقادیر فیلدهای عمومی غیرمحرمانه
   encryptedValues Json         @default("{}") // مقادیر رمزنگاری شده با الگوریتم AES-256-GCM
   expiryDate      DateTime?    // تاریخ سررسید/انقضا (برای یادآورها)
@@ -82,6 +85,8 @@ model Asset {
   renewals        RenewalLog[]
 
   @@index([assetTypeId])
+  @@index([assetTypeId, createdAt(sort: Desc)])
+  @@index([title])
   @@index([expiryDate])
   @@map("assets")
 }
@@ -143,5 +148,6 @@ model RenewalLog {
   renewedAt          DateTime  @default(now())
 
   @@index([assetId])
+  @@index([newExpiryDate])
   @@map("renewal_logs")
 }

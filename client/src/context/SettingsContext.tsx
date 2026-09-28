@@ -57,6 +57,11 @@ export interface AppSettings {
   defaultDensity: 'compact' | 'comfortable';
   theme: 'light' | 'dark';
   enableStrengthMeter: boolean;
+  copyFeedbackSound: boolean;
+  calendarType: 'jalali' | 'gregorian';
+  persianNumbers: boolean;
+  defaultLandingTab: 'dashboard' | 'assets' | 'reminders';
+  avatarColor: string;
   alerts: AlertSettings;
 }
 
@@ -68,6 +73,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultDensity: 'compact',
   theme: 'light',
   enableStrengthMeter: true,
+  copyFeedbackSound: true,
+  calendarType: 'jalali',
+  persianNumbers: true,
+  defaultLandingTab: 'dashboard',
+  avatarColor: 'indigo',
   alerts: {
     enableAlerts: false,
     cronEnabled: true,

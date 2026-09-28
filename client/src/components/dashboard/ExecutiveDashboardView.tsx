@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { AssetType } from '../../services/asset-types.service';
 import { Asset, assetsService, DashboardSummaryResponse } from '../../services/assets.service';
+import { AssetIcon } from '../common/AssetIcon';
 
 interface ExecutiveDashboardViewProps {
   assetTypes: AssetType[];
@@ -42,20 +43,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
   // دریافت آیکون دسته‌بندی
   const getCategoryIcon = (iconName?: string) => {
-    switch (iconName?.toLowerCase()) {
-      case 'server':
-        return <Server className="w-4 h-4 text-indigo-500" />;
-      case 'mail':
-        return <Mail className="w-4 h-4 text-emerald-500" />;
-      case 'globe':
-        return <Globe className="w-4 h-4 text-sky-500" />;
-      case 'key':
-        return <Key className="w-4 h-4 text-amber-500" />;
-      case 'database':
-        return <Database className="w-4 h-4 text-purple-500" />;
-      default:
-        return <Layers className="w-4 h-4 text-slate-500" />;
-    }
+    return <AssetIcon name={iconName || 'Server'} className="w-4 h-4 text-indigo-500" />;
   };
 
   // بارگذاری داده‌های داشبورد (با فال‌بک لوکال برای حالت دمو/آفلاین)
@@ -477,40 +465,40 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
       {/* ۲. کارت‌های شاخص کلیدی (KPI Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* شاخص ۱: مجموع دارایی‌ها */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-indigo-500/50 transition">
+        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-indigo-500/50 dark:hover:border-indigo-500/40 transition">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">کل دارایی‌های ثبت‌شده</span>
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-              <Layers className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">کل دارایی‌های ثبت‌شده</span>
+            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400 dark:border dark:border-indigo-500/25">
+              <Layers className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
               {(data?.totalAssets || 0).toLocaleString('fa-IR')}
             </span>
-            <span className="text-xs text-slate-500">قلم دارایی</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">قلم دارایی</span>
           </div>
-          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-border-subtle/50 pt-2">
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-border-subtle pt-2">
             <span>در {assetTypes.length} دسته‌بندی فعال</span>
             <span className="text-emerald-600 dark:text-emerald-400 font-medium">پایش ۱۰۰٪</span>
           </div>
         </div>
 
         {/* شاخص ۲: بودجه ماهانه تومانی */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-emerald-500/50 transition">
+        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-emerald-500/50 dark:hover:border-emerald-500/40 transition">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">هزینه ماهانه (تومان)</span>
-            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">هزینه ماهانه (تومان)</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/25">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-1.5">
             <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
               {tomanMonthly.toLocaleString('fa-IR')}
             </span>
-            <span className="text-xs text-slate-500">تومان / ماه</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">تومان / ماه</span>
           </div>
-          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-border-subtle/50 pt-2">
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-border-subtle pt-2">
             <span>تخمین سالانه:</span>
             <span className="font-mono font-medium text-emerald-600 dark:text-emerald-400">
               {tomanYearly.toLocaleString('fa-IR')} ت
@@ -519,11 +507,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
         </div>
 
         {/* شاخص ۳: تعهدات ارزی ماهانه (دلار و یورو) */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-sky-500/50 transition">
+        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-sky-500/50 dark:hover:border-sky-500/40 transition">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">هزینه‌های ارزی (ماهانه)</span>
-            <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400">
-              <DollarSign className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">هزینه‌های ارزی (ماهانه)</span>
+            <div className="p-2 rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400 dark:border dark:border-sky-500/25">
+              <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-3">
@@ -541,7 +529,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
               <span className="text-[11px] text-slate-400 font-sans">یورو</span>
             </div>
           </div>
-          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-border-subtle/50 pt-2">
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-border-subtle pt-2">
             <span>سالانه:</span>
             <span className="font-mono text-sky-600 dark:text-sky-400 font-medium">
               ${usdYearly} + €{eurYearly}
@@ -550,20 +538,20 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
         </div>
 
         {/* شاخص ۴: وضعیت سررسید و انقضا */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-amber-500/50 transition">
+        <div className="p-4 rounded-2xl bg-white dark:bg-surface-1 border border-slate-200/80 dark:border-border-subtle shadow-xs relative overflow-hidden group hover:border-amber-500/50 dark:hover:border-amber-500/40 transition">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">رادار انقضا و تمدید</span>
-            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400">
-              <Clock className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">رادار انقضا و تمدید</span>
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400 dark:border dark:border-amber-500/25">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
               {(data?.expiringAssets.length || 0).toLocaleString('fa-IR')}
             </span>
-            <span className="text-xs text-slate-500">نیاز به تمدید</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">نیاز به تمدید</span>
           </div>
-          <div className="mt-2.5 flex items-center justify-between text-[11px] border-t border-slate-100 dark:border-border-subtle/50 pt-2">
+          <div className="mt-2.5 flex items-center justify-between text-[11px] border-t border-slate-100 dark:border-border-subtle pt-2">
             {expiredCount > 0 ? (
               <span className="text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
@@ -614,20 +602,20 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                           {cat.name}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 font-mono text-xs">
+                      <div className="flex items-center gap-2 text-xs">
                         <span className="font-bold text-slate-900 dark:text-white">
                           {cat.count.toLocaleString('fa-IR')}
                         </span>
-                        <span className="text-[11px] text-slate-400">({percentage}٪)</span>
-                        <ChevronLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 group-hover:-translate-x-1 transition" />
+                        <span className="text-[11px] text-slate-400">({percentage.toLocaleString('fa-IR')}٪)</span>
+                        <ChevronLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:-translate-x-1 transition" />
                       </div>
                     </div>
 
                     {/* نوار پیشرفت بصری */}
-                    <div className="w-full bg-slate-200 dark:bg-surface-3 h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-200 dark:bg-surface-3 h-2 rounded-full overflow-hidden border border-slate-300/40 dark:border-white/5">
                       <div
-                        className="bg-indigo-600 h-full rounded-full transition-all duration-500 group-hover:bg-indigo-500"
-                        style={{ width: `${Math.max(percentage, 3)}%` }}
+                        className="bg-gradient-to-l from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-500 group-hover:from-indigo-400 group-hover:to-indigo-500 shadow-xs shadow-indigo-500/20"
+                        style={{ width: `${cat.count > 0 ? Math.max(percentage, 4) : 0}%` }}
                       />
                     </div>
                   </div>
@@ -662,15 +650,15 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
               </div>
 
               {/* تب‌های ارز */}
-              <div className="flex items-center bg-slate-100 dark:bg-surface-2 p-1 rounded-xl text-[11px] font-medium">
+              <div className="flex items-center bg-slate-100 dark:bg-surface-2 p-1 rounded-xl text-[11px] font-medium border border-transparent dark:border-border-subtle">
                 {(['تومان', 'دلار ($)', 'یورو (€)'] as const).map((curr) => (
                   <button
                     key={curr}
                     onClick={() => setSelectedCurrencyTab(curr)}
                     className={`px-2.5 py-1 rounded-lg transition ${
                       selectedCurrencyTab === curr
-                        ? 'bg-white dark:bg-surface-1 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                        ? 'bg-white dark:bg-surface-1 text-indigo-600 dark:text-indigo-400 shadow-xs font-bold border border-slate-200/60 dark:border-border-subtle'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
                     {curr}
@@ -723,17 +711,17 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                   </div>
 
                   {/* راهنمای دوره‌های پرداخت */}
-                  <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-500/20 text-xs space-y-2">
-                    <div className="flex items-center justify-between text-indigo-900 dark:text-indigo-200 font-medium">
+                  <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-500/25 text-xs space-y-2">
+                    <div className="flex items-center justify-between text-indigo-900 dark:text-indigo-300 font-medium">
                       <span className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                         مدل‌سازی خودکار دوره‌ها
                       </span>
-                      <span className="text-[10px] font-mono bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-mono bg-indigo-100 dark:bg-indigo-900/60 dark:text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-200/50 dark:border-indigo-500/30">
                         هوشمند
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
                       هزینه‌های سالانه به صورت ماهانه تقسیم بر ۱۲ نرمال‌سازی می‌شوند و هزینه‌های ماهانه برای ۱۲ ماه سال ضرب می‌شوند تا درک کاملی از هزینه‌کرد سازمان ارائه گردد.
                     </p>
                   </div>
@@ -788,7 +776,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                       </div>
                     </td>
                     <td className="py-2.5 px-2 text-slate-600 dark:text-slate-400">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-surface-2 text-[10px] font-medium">
+                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-surface-3 dark:text-slate-300 dark:border dark:border-white/5 text-[10px] font-medium">
                         {driver.assetTypeName || 'عمومی'}
                       </span>
                     </td>
@@ -806,7 +794,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                     <td className="py-2.5 pl-2 text-left">
                       <button
                         onClick={() => handleAssetClick(driver.id)}
-                        className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded hover:bg-slate-100 dark:hover:bg-surface-3 transition"
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-surface-3 transition"
                         title="مشاهده جزئیات دارایی"
                       >
                         <ArrowUpRight className="w-4 h-4" />
@@ -852,10 +840,10 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                     onClick={() => handleAssetClick(exp.id)}
                     className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
                       exp.isExpired
-                        ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40 hover:border-rose-400'
+                        ? 'bg-rose-50/60 dark:bg-rose-950/25 border-rose-200 dark:border-rose-900/50 hover:border-rose-400 dark:hover:border-rose-700'
                         : isUrgent
-                        ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40 hover:border-amber-400'
-                        : 'bg-slate-50 dark:bg-surface-2 border-slate-200/70 dark:border-border-subtle hover:border-slate-300'
+                        ? 'bg-amber-50/60 dark:bg-amber-950/25 border-amber-200 dark:border-amber-900/50 hover:border-amber-400 dark:hover:border-amber-700'
+                        : 'bg-slate-50 dark:bg-surface-2 border-slate-200/70 dark:border-border-subtle hover:border-slate-300 dark:hover:border-border-strong'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -878,16 +866,16 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
                     <div className="shrink-0 flex items-center gap-2">
                       {exp.isExpired ? (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-transparent dark:border-rose-800/50 flex items-center gap-1">
                           <AlertTriangle className="w-3 h-3" />
                           منقضی شده
                         </span>
                       ) : isUrgent ? (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-transparent dark:border-amber-800/50">
                           {exp.daysRemaining.toLocaleString('fa-IR')} روز مانده
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-transparent dark:border-sky-800/50">
                           {exp.daysRemaining.toLocaleString('fa-IR')} روز
                         </span>
                       )}

@@ -28,6 +28,7 @@ export async function createAsset(params: {
   userId: string;
   assetTypeId: string;
   title: string;
+  icon?: string | null;
   inputValues: Record<string, any>;
   tags?: string[];
   expiryDate?: Date | null;
@@ -65,6 +66,7 @@ export async function createAsset(params: {
     data: {
       assetTypeId: params.assetTypeId,
       title: params.title.trim(),
+      icon: params.icon || null,
       values: normalValues,
       encryptedValues: encryptedValues as any,
       expiryDate: params.expiryDate || null,
@@ -99,6 +101,7 @@ export async function createAssetsBatch(params: {
   assetTypeId: string;
   items: Array<{
     title: string;
+    icon?: string | null;
     inputValues: Record<string, any>;
     tags?: string[];
     expiryDate?: Date | null;
@@ -142,6 +145,7 @@ export async function createAssetsBatch(params: {
       data: {
         assetTypeId: params.assetTypeId,
         title: item.title.trim(),
+        icon: item.icon || null,
         values: normalValues,
         encryptedValues: encryptedValues as any,
         expiryDate: item.expiryDate || null,
@@ -176,6 +180,7 @@ export async function updateAsset(params: {
   assetId: string;
   userId: string;
   title?: string;
+  icon?: string | null;
   inputValues?: Record<string, any>;
   tags?: string[];
   expiryDate?: Date | null;
@@ -221,11 +226,15 @@ export async function updateAsset(params: {
   if (params.title && params.title !== existing.title) {
     diff['title'] = { old: existing.title, new: params.title };
   }
+  if (params.icon !== undefined && params.icon !== existing.icon) {
+    diff['icon'] = { old: existing.icon || 'پیش‌فرض', new: params.icon || 'پیش‌فرض' };
+  }
 
   const updated = await prisma.asset.update({
     where: { id: params.assetId },
     data: {
       title: params.title ?? existing.title,
+      icon: params.icon !== undefined ? params.icon : existing.icon,
       values: updatedNormal,
       encryptedValues: updatedEncrypted as any,
       expiryDate: params.expiryDate !== undefined ? params.expiryDate : existing.expiryDate,

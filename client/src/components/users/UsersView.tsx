@@ -100,7 +100,11 @@ export function UsersView({ assetTypes }: UsersViewProps) {
     setIsLoading(true);
     try {
       const res = await usersService.getAll();
-      setUsers(res.items);
+      const items = Array.isArray(res?.items) ? res.items.map((u) => ({
+        ...u,
+        categoryPermissions: Array.isArray(u.categoryPermissions) ? u.categoryPermissions : [],
+      })) : [];
+      setUsers(items);
     } catch (err: any) {
       console.warn('API users unreachable, falling back to demo mode:', err);
       setUsers(DEMO_USERS);
@@ -329,7 +333,7 @@ export function UsersView({ assetTypes }: UsersViewProps) {
                     <td className="p-3 text-center text-slate-400 dark:text-slate-500 font-mono">{index + 1}</td>
                     <td className="p-3 font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-600/20 dark:text-indigo-400 dark:border-transparent flex items-center justify-center font-bold text-[10px]">
-                        {u.fullName.slice(0, 1)}
+                        {(u.fullName || 'کاربر').slice(0, 1)}
                       </div>
                       <span>{u.fullName}</span>
                       {isSelf && (
@@ -341,10 +345,10 @@ export function UsersView({ assetTypes }: UsersViewProps) {
                     <td className="p-3">
                       {u.role === 'ADMIN' ? (
                         <span className="text-slate-500 dark:text-slate-400 text-[11px]">دسترسی کامل به تمام دسته‌ها</span>
-                      ) : u.categoryPermissions.length > 0 ? (
+                      ) : Array.isArray(u.categoryPermissions) && u.categoryPermissions.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {u.categoryPermissions.map((catId) => {
-                            const cat = assetTypes.find((t) => t.id === catId);
+                            const cat = (assetTypes || []).find((t) => t.id === catId);
                             return (
                               <span
                                 key={catId}
@@ -558,3 +562,5 @@ export function UsersView({ assetTypes }: UsersViewProps) {
     </div>
   );
 }
+
+export default UsersView;
