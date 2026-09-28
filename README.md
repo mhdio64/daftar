@@ -47,12 +47,15 @@ nano .env   # Edit the values below
 ```
 
 > [!IMPORTANT]
-> Generate secure secrets before deploying:
+> Generate secure secrets before deploying using `openssl` (pre-installed on all Linux servers):
 > ```bash
-> # Run this twice — once for JWT_SECRET, once for MASTER_ENCRYPTION_KEY:
-> node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+> # Generate JWT_SECRET and MASTER_ENCRYPTION_KEY (run twice — 64 hex characters):
+> openssl rand -hex 32
+>
+> # Generate a strong PostgreSQL password (32 hex chars, URL/connection-string safe):
+> openssl rand -hex 16
 > ```
-> Paste the outputs into your `.env` file and set a strong `POSTGRES_PASSWORD`.
+> Paste the outputs into your `.env` file.
 
 ### 3. Start everything
 ```bash
