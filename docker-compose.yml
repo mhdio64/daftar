@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # وب‌سرور معکوس و HTTPS خودکار برای شبکه داخلی LAN
   caddy:
