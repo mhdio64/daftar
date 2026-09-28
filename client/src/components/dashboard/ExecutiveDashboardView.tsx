@@ -323,13 +323,14 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
   // محاسبه آمار فیلتر شده
   const filteredCategoryStats = useMemo(() => {
     if (!data) return [];
-    if (selectedFilterCategory === 'all') return data.categoryStats;
-    return data.categoryStats.filter((c) => c.id === selectedFilterCategory);
+    const list = data.categoryStats || [];
+    if (selectedFilterCategory === 'all') return list;
+    return list.filter((c) => c.id === selectedFilterCategory);
   }, [data, selectedFilterCategory]);
 
   const filteredExpiring = useMemo(() => {
     if (!data) return [];
-    let items = data.expiringAssets;
+    let items = data.expiringAssets || [];
     if (selectedFilterCategory !== 'all') {
       items = items.filter((a) => a.assetTypeId === selectedFilterCategory);
     }
@@ -344,7 +345,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
 
   const filteredCostDrivers = useMemo(() => {
     if (!data) return [];
-    let items = data.costDrivers;
+    let items = data.costDrivers || [];
     if (selectedFilterCategory !== 'all') {
       items = items.filter((a) => a.assetTypeId === selectedFilterCategory);
     }
@@ -547,7 +548,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
-              {(data?.expiringAssets.length || 0).toLocaleString('fa-IR')}
+              {(data?.expiringAssets?.length || 0).toLocaleString('fa-IR')}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">نیاز به تمدید</span>
           </div>

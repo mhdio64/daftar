@@ -18,4 +18,4 @@ RUN pnpm build
 FROM alpine:latest
 WORKDIR /usr/share/caddy
 COPY --from=builder /app/client/dist ./
-CMD ["sh", "-c", "cp -r /usr/share/caddy/* /target/ 2>/dev/null || true"]
+CMD ["sh", "-c", "rm -rf /target/* && cp -r /usr/share/caddy/* /target/ 2>/dev/null || true"]
